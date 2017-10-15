@@ -1,45 +1,61 @@
+OUTPUT_FORMAT("elf64-x86-64")
+OUTPUT_ARCH(i386:x86-64)
 ENTRY(_start)
+PHDRS {
+  physical PT_LOAD FILEHDR PHDRS;
+  virtual PT_LOAD;
+}
 
 SECTIONS
 {
-  KERNEL_VMA = 0x8000000000000000;
-  . = KERNEL_VMA;
+  /* starts from 1MB */
+  . = 1M;
+  . += SIZEOF_HEADERS;
 
-  .text : AT(ADDR(.text) - KERNEL_VMA)
+  .physicaltext : ALIGN(4K)
   {
-    _code = .;
+    boot/boot.o (.multiboot)
+    boot/boot.o (.text)
+  } : physical
+  .physicalrodata : ALIGN(4K)
+  {
+    boot/boot.o (.rodata)
+  } : physical
+  .physicaldata : ALIGN(4K)
+  {
+    boot/boot.o (.data)
+  } : physical
+  .physicalbss : ALIGN(4K)
+  {
+    boot/boot.o (.bss COMMON)
+  } : physical
+
+  _kernel_start_pa = ALIGN(4K);
+
+  _kernel_start_va = 0x80000000;
+  . = _kernel_start_va;
+
+  .text : AT(_kernel_start_pa) ALIGN(4K)
+  {
     *(.text)
-    *(.rodata*)
-    . = ALIGN(4096);
-  }
+    /**(EXCLUDE_FILE(*boot/boot.o) .text)*/
+  } : virtual
 
- .data : AT(ADDR(.data) - KERNEL_VMA)
- {
-    _data = .;
+  .rodata : AT(LOADADDR(.text) + SIZEOF(.text)) ALIGN(4K)
+  {
+    *(.rodata)
+    /**(EXCLUDE_FILE(*boot/boot.o) .rodata)*/
+  } : virtual
+
+  .data : AT(LOADADDR(.rodata) + SIZEOF(.rodata)) ALIGN(4K)
+  {
     *(.data)
-    . = ALIGN(4096);
- }
+    /**(EXCLUDE_FILE(*boot/boot.o) .data)*/
+  } : virtual
 
- .eh_frame : AT(ADDR(.eh_frame) - KERNEL_VMA)
- {
-   _ehframe = .;
-   *(.eh_frame)
-    . = ALIGN(4096);
- }
-
- .bss : AT(ADDR(.bss) - KERNEL_VMA)
- {
-   _bss = .;
-   *(.bss)
-
-   /*
-    * You usually need to include generated COMMON symbols
-    * under kernel BSS section or use gcc's -fno-common
-    */
-
-    *(COMMON)
-   . = ALIGN(4096);
- }
-
- _end = .;
+  .bss : AT(LOADADDR(.data) + SIZEOF(.data)) ALIGN(4K)
+  {
+    *(.bss COMMON)
+    /**(EXCLUDE_FILE(*boot/boot.o) .bss COMMON)*/
+  } : virtual
 }
