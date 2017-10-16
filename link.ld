@@ -37,25 +37,21 @@ SECTIONS
 
   .text : AT(_kernel_start_pa) ALIGN(4K)
   {
-    *(.text)
-    /**(EXCLUDE_FILE(*boot/boot.o) .text)*/
+    *(EXCLUDE_FILE(*boot/boot.o) .text)
   } : virtual
 
   .rodata : AT(LOADADDR(.text) + SIZEOF(.text)) ALIGN(4K)
   {
-    *(.rodata)
-    /**(EXCLUDE_FILE(*boot/boot.o) .rodata)*/
+    *(EXCLUDE_FILE(*boot/boot.o) .rodata)
   } : virtual
 
   .data : AT(LOADADDR(.rodata) + SIZEOF(.rodata)) ALIGN(4K)
   {
-    *(.data)
-    /**(EXCLUDE_FILE(*boot/boot.o) .data)*/
+    *(EXCLUDE_FILE(*boot/boot.o) .data)
   } : virtual
 
   .bss : AT(LOADADDR(.data) + SIZEOF(.data)) ALIGN(4K)
   {
-    *(.bss COMMON)
-    /**(EXCLUDE_FILE(*boot/boot.o) .bss COMMON)*/
+    *(EXCLUDE_FILE(*boot/boot.o) .bss COMMON)
   } : virtual
 }

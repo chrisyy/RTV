@@ -20,9 +20,11 @@
 
   .section .bss
   .align 0x1000
-stack_bottom:
-  .skip 4096  /* 4KB stack */
-stack_top: 
+  .comm stack, 0x1000  /* 4KB stack */
+
+  .comm PML4T, 0x1000
+  .comm PDPT, 0x1000
+  .comm PDT, 0x1000
   
   /* multiboot 2 */
   .section .multiboot
@@ -43,8 +45,47 @@ header_end:
   .global _start
 
 _start:
-  mov $stack_top, %esp
+  /* disable paging */
+  movl %cr0, %eax
+  andl $0x7FFFFFFF, %eax
+  movl %eax, %cr0
 
+  /* set up first 2MB identity mapping */
+  movl $PDPT, %eax
+  orl $0x3, %eax  /* present+write bits */
+  movl %eax, PML4T
+
+  movl $PDT, %eax
+  orl 0x3, %eax
+  movl %eax, PDPT
+
+  movl $0x200000, %eax
+  orl 0x83, %eax  /* 2MB page */
+  movl %eax, PDT
+
+  movl $PML4T, %eax
+  movl %eax, %cr3
+
+  /* enable PAE paging */
+  movl %cr4, %eax
+  orl 0x20, %eax
+  movl %eax, %cr4
+
+  /* set long mode */
+  movl $0xC0000080, %ecx  /* IA32_EFER */
+  rdmsr
+  orl 0x100, %eax
+  wrmsr
+
+  /* enable paging */
+  movl %cr0, %eax
+  orl 0x80000000, %eax
+  movl %eax, %cr0
+
+  /* testing */
+  movl $0x2F4B2F4F, 0xB8000
+
+  movl $stack, %esp
   call kernel_main
 
   cli
