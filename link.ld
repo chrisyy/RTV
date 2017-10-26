@@ -32,7 +32,7 @@ SECTIONS
 
   _kernel_start_pa = ALIGN(4K);
 
-  _kernel_start_va = 0x80000000;
+  _kernel_start_va = _kernel_start_pa;
   . = _kernel_start_va;
 
   .text : AT(_kernel_start_pa) ALIGN(4K)

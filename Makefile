@@ -40,6 +40,9 @@ iso:
 run:
 	qemu-system-x86_64 -cdrom $(PROG).iso -m 4G &
 
+debug:
+	qemu-system-x86_64 -s -S -cdrom $(PROG).iso -m 4G &
+
 clean:
 	rm -rf $(OBJS) $(PROG) $(DEPS) $(PROG).iso $(ISO_DIR)
 
