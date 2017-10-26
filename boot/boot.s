@@ -79,12 +79,12 @@ _start:
   movl $0x83, %eax  /* 2MB page */
   movl %eax, PDT
 
-  movl $0X200000, %eax
+  movl $0x200000, %eax
   orl $0x83, %eax   /* 2MB page */
   movl %eax, PDT+8
 
   movl $PML4T, %eax
-  movl %eax, %cr3
+  movl %eax, %cr3 
 
   /* enable PAE paging */
   movl %cr4, %eax
@@ -100,14 +100,14 @@ _start:
   /* enable paging */
   movl %cr0, %eax
   orl $0x80000000, %eax
-  movl %eax, %cr0
+  movl %eax, %cr0 
 
   lgdt GDT_ptr
-  ljmp $0x8, $kernel_main
-  //ljmp $0x8, $_start64
+  ljmp $0x8, $_start64
   
   /* error */
   cli
+
   movb $0x2F, %ah
   movl MSG_LEN, %ecx
   movl $MSG, %esi
