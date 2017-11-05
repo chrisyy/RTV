@@ -15,16 +15,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "msr.h"
+
   .set MAGIC, 0xE85250D6
   .set ARCH, 0x0
 
   .section .bss
   .align 0x1000
-  .global PDT
 
   .comm PML4T, 0x1000
   .comm PDPT, 0x1000
   .comm PDT, 0x1000
+
+stack:
+  .skip 4096
+stack_top:
 
   .section .rodata
 GDT64:
@@ -51,6 +56,7 @@ header_start:
   .long ARCH
   .long header_end - header_start
   .long -(MAGIC + ARCH + header_end - header_start)
+  /* ending tag */
   .short 0
   .short 0
   .long 0x8
@@ -62,6 +68,10 @@ header_end:
   .global _start
 
 _start:
+  movl $stack_top, %esp
+  pushl %eax  /* multiboot_magic */
+  pushl %ebx  /* multiboot_info */
+
   /* disable paging */
   movl %cr0, %eax
   andl $0x7FFFFFFF, %eax
@@ -93,6 +103,7 @@ _start:
 
   /* set long mode */
   movl $0xC0000080, %ecx  /* IA32_EFER */
+  //movl $IA32_EFER, %ecx  /* TODO: how to use C MACRO? */
   rdmsr
   orl $0x100, %eax
   wrmsr
@@ -116,6 +127,7 @@ _start:
   lodsb
   stosw
   loop 1b
+
 2:
   hlt
   jmp 2b

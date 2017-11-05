@@ -1,5 +1,6 @@
 
 TARGET := x86_64-elf
+ARCH := x86_64
 CC := $(TARGET)-gcc
 LD := $(TARGET)-ld
 
@@ -11,19 +12,19 @@ OBJS := $(CSRCS:%.c=%.o)
 OBJS += $(ASRCS:%.s=%.o)
 DEPS := $(OBJS:.o=.d)
 
-INC_DIR := ./include
-ISO_DIR := ./iso
+INC_FLAGS := -Iinclude -Iarch/$(ARCH)/include
+ISO_DIR := iso
 
 #-z max-page-size may not be needed
-CFLAGS := -ffreestanding -mcmodel=large -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -g -Wall -MMD -lgcc -I$(INC_DIR)
+CFLAGS := -ffreestanding -mcmodel=large -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -g -Wall -MMD -lgcc $(INC_FLAGS)
 LDFLAGS := -nostdlib -z max-page-size=4096
 
-.PHONY: all clean
+.PHONY: all iso clean
 
 all: $(PROG) iso
 
 $(PROG): $(OBJS)
-	$(LD) -T link.ld -o $@ $^ $(LDFLAGS)
+	$(LD) -T arch/$(ARCH)/link.ld -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
