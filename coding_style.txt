@@ -1,0 +1,74 @@
+Indentation: 2 spaces
+
+Comment:
+/* ... */
+
+// ABCDEFG
+
+/*
+ * ABCDEFG
+ * ...
+ */
+
+data types:
+for string, use char;
+otherwise, be explicit with bit length (stdint types):
+int32_t, uint8_t, ...
+
+
+(use upper case for constant hex numbers)
+int *ptr = 0xFC01;
+
+TypeA X = (TypeA) Y;
+
+TypeABCDEFGHIJKLMN X
+  = Y;
+
+TypeA *X = (TypeA *) Y;
+
+if (x) {
+  ...
+} else {
+  ...
+}
+
+if (x && y) {
+  ...
+}
+
+switch (cond) {
+  case x:
+    a++;
+    break;
+
+  case y:
+    b--;
+    break;
+}
+
+for (i = 1; i < limit; i++) {
+  ...
+}
+
+do {
+  ...
+} while (x);
+
+y = foo(x);
+
+void foo(uint32_t a, uint32_t b, uint32_t c,
+         uint32_t d, uint32_t e)
+{
+  ...
+}
+
+y = foo(a, b, c,
+        d, e);
+
+#define XYZ 12
+#define DDDDD (12 * 10)
+
+__asm__ volatile("abc" : y : "a"(x) : z);
+
+Function naming: lower case
+module_action_action(...)

@@ -28,7 +28,7 @@
   .comm PDT, 0x1000
 
 stack:
-  .skip 4096
+  .skip 0x1000
 stack_top:
 
   .section .rodata
@@ -102,8 +102,7 @@ _start:
   movl %eax, %cr4
 
   /* set long mode */
-  movl $0xC0000080, %ecx  /* IA32_EFER */
-  //movl $IA32_EFER, %ecx  /* TODO: how to use C MACRO? */
+  movl $IA32_EFER, %ecx
   rdmsr
   orl $0x100, %eax
   wrmsr

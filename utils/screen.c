@@ -18,24 +18,23 @@
 #include <stdarg.h>
 #include "types.h"
 
+
 /*  The number of columns. */
 #define COLUMNS                 80
 /*  The number of lines. */
 #define LINES                   24
 /*  The attribute of an character. */
 #define ATTRIBUTE               7
-/*  The video memory address. */
-#define VIDEO                   0xB8000
 
+/*  The video memory address. */
+uint8_t *frameBuf = 0xB8000;
 /*  Save the X position. */
-static int xpos;
+static uint16_t xpos;
 /*  Save the Y position. */
-static int ypos;
+static uint16_t ypos;
 
 static void _putchar(char c)
 {
-  volatile unsigned char *video = (unsigned char *) VIDEO;
-
   if (c == '\n' || c == '\r')
   {
 newline:
@@ -46,8 +45,8 @@ newline:
     return;
   }
 
-  *(video + (xpos + ypos * COLUMNS) * 2) = c & 0xFF;
-  *(video + (xpos + ypos * COLUMNS) * 2 + 1) = ATTRIBUTE;
+  *(frameBuf + (xpos + ypos * COLUMNS) * 2) = c & 0xFF;
+  *(frameBuf + (xpos + ypos * COLUMNS) * 2 + 1) = ATTRIBUTE;
 
   xpos++;
   if (xpos >= COLUMNS)
@@ -66,160 +65,160 @@ void vprintf(void putc(char), const char *fmt, va_list args)
   while (*fmt) {
     /* handle ordinary characters and directives */
     switch (*fmt) {
-    case '\0':
-      return;
+      case '\0':
+        return;
 
-    case '%':
-      fmt++;
-      precision = 0;
-      width = 0;
-      upper = 1;
-      padding = ' ';
-      ells = 0;
-#define PRINTF_MODE_PRECISION 1
-      mode = 0;
-      /* handle directive arguments */
-      while (*fmt) {
-        switch (*fmt) {
-        case 'x':
-          upper = 0;
-
-        case 'X':{
-          /* hexadecimal output */
-          uint64_t x;
-          uint32_t i, li, print_padding = 0, print_digits = 0;
-          int32_t w = (ells == 2 ? 16 : 8);
-
-          if (ells == 2)
-            x = va_arg(args, uint64_t);
-          else
-            x = va_arg(args, uint32_t);
-
-          for (i = 0; i < w; i++) {
-            li = (x >> (((w - 1) - i) << 2)) & 0x0F;
-
-#define HANDLE_OPTIONS(q,max_w,end_i)                                   \
-            if (q != 0 || i == end_i)                                   \
-              print_digits = 1;                                         \
-            if (q == 0 && !print_digits && i >= (max_w - width))        \
-              print_padding = 1;                                        \
-            if (q == 0 && !print_digits && i >= (max_w - precision))    \
-              print_digits = 1;                                         \
-            if (q == 0 && print_padding && !print_digits)               \
-              putc(padding);
-
-            HANDLE_OPTIONS(li, w, (w-1));
-
-            if (print_digits) {
-              if (li > 9)
-                putc((upper ? 'A' : 'a') + li - 0x0A);
-              else
-                putc('0' + li);
-            }
-          }
-
-          goto directive_finished;
-        }  
-        case 'u':{
-            /* decimal output */
-            uint32_t x = va_arg(args, uint32_t);
-            uint32_t i, q, print_padding = 0, print_digits = 0;
-            uint32_t *divisors = base10_u32_divisors;
-
-            for (i = 0; i < 10; i++) {
-              q = x / divisors[i];
-              x %= divisors[i];
-
-              HANDLE_OPTIONS(q, 10, 9);
-
-              if (print_digits)
-                putc('0' + q);
-            }
-            goto directive_finished;
-        }  
-        case 'd':{
-            /* decimal output */
-            int32_t x = va_arg(args, int32_t);
-            uint32_t i, q, print_padding = 0, print_digits = 0;
-            uint32_t *divisors = base10_u32_divisors;
-
-            if (x < 0) {
-              putc('-');
-              x *= -1;
-            }
-
-            for (i = 0; i < 10; i++) {
-              q = x / divisors[i];
-              x %= divisors[i];
-
-              HANDLE_OPTIONS(q, 10, 9);
-
-              if (print_digits)
-                putc('0' + q);
-            }
-            goto directive_finished;
-        }  
-        case 's':{
-            /* string argument */
-            char *s = va_arg(args, char *);
-            if (s) {
-              if (precision > 0)
-                while (*s && precision-- > 0)
-                  putc(*s++);
-              else
-                while (*s)
-                  putc(*s++);
-            } else {
-              putc('('); 
-              putc('n'); 
-              putc('u'); 
-              putc('l'); 
-              putc('l'); 
-              putc(')');
-            }
-            goto directive_finished;
-        }  
-        case '%':{
-            /* single % */
-            putc('%');
-            goto directive_finished;
-        }  
-        case 'l':{
-          /* "long" annotation */
-          ells++;
-          break;
-        }
-        case '.':{
-          mode = PRINTF_MODE_PRECISION;
-          break;
-        }
-        default:
-          if ('0' <= *fmt && *fmt <= '9') {
-            if (mode == PRINTF_MODE_PRECISION) {
-              /* precision specifier */
-              precision *= 10;
-              precision += *fmt - '0';
-            } else if (mode == 0 && width == 0 && *fmt == '0') {
-              /* padding char is zero */
-              padding = '0';
-            } else {
-              /* field width */
-              width *= 10;
-              width += *fmt - '0';
-            }
-          }
-          break;
-        }
-
+      case '%':
         fmt++;
-      }
+        precision = 0;
+        width = 0;
+        upper = 1;
+        padding = ' ';
+        ells = 0;
+#define PRINTF_MODE_PRECISION 1
+        mode = 0;
+        /* handle directive arguments */
+        while (*fmt) {
+          switch (*fmt) {
+            case 'x':
+              upper = 0;
+  
+            case 'X': {
+              /* hexadecimal output */
+              uint64_t x;
+              uint32_t i, li, print_padding = 0, print_digits = 0;
+              int32_t w = (ells == 2 ? 16 : 8);
+  
+#define HANDLE_OPTIONS(q,max_w,end_i)                                     \
+              if (q != 0 || i == end_i)                                   \
+                print_digits = 1;                                         \
+              if (q == 0 && !print_digits && i >= (max_w - width))        \
+                print_padding = 1;                                        \
+              if (q == 0 && !print_digits && i >= (max_w - precision))    \
+                print_digits = 1;                                         \
+              if (q == 0 && print_padding && !print_digits)               \
+                putc(padding);
+
+              if (ells == 2)
+                x = va_arg(args, uint64_t);
+              else
+                x = va_arg(args, uint32_t);
+  
+              for (i = 0; i < w; i++) {
+                li = (x >> (((w - 1) - i) << 2)) & 0x0F;
+
+                HANDLE_OPTIONS(li, w, (w-1));
+
+                if (print_digits) {
+                  if (li > 9)
+                    putc((upper ? 'A' : 'a') + li - 0x0A);
+                  else
+                    putc('0' + li);
+                }
+              }
+
+              goto directive_finished;
+            }  
+            case 'u': {
+                /* decimal output */
+                uint32_t x = va_arg(args, uint32_t);
+                uint32_t i, q, print_padding = 0, print_digits = 0;
+                uint32_t *divisors = base10_u32_divisors;
+
+                for (i = 0; i < 10; i++) {
+                  q = x / divisors[i];
+                  x %= divisors[i];
+
+                  HANDLE_OPTIONS(q, 10, 9);
+
+                  if (print_digits)
+                    putc('0' + q);
+                }
+                goto directive_finished;
+            }  
+            case 'd': {
+                /* decimal output */
+                int32_t x = va_arg(args, int32_t);
+                uint32_t i, q, print_padding = 0, print_digits = 0;
+                uint32_t *divisors = base10_u32_divisors;
+
+                if (x < 0) {
+                  putc('-');
+                  x *= -1;
+                }
+
+                for (i = 0; i < 10; i++) {
+                  q = x / divisors[i];
+                  x %= divisors[i];
+
+                  HANDLE_OPTIONS(q, 10, 9);
+
+                  if (print_digits)
+                    putc('0' + q);
+                }
+                goto directive_finished;
+            }  
+            case 's': {
+                /* string argument */
+                char *s = va_arg(args, char *);
+                if (s) {
+                  if (precision > 0)
+                    while (*s && precision-- > 0)
+                      putc(*s++);
+                  else
+                    while (*s)
+                      putc(*s++);
+                } else {
+                  putc('('); 
+                  putc('n'); 
+                  putc('u'); 
+                  putc('l'); 
+                  putc('l'); 
+                  putc(')');
+                }
+                goto directive_finished;
+            }  
+            case '%': {
+                /* single % */
+                putc('%');
+                goto directive_finished;
+            }  
+            case 'l': {
+              /* "long" annotation */
+              ells++;
+              break;
+            }
+            case '.': {
+              mode = PRINTF_MODE_PRECISION;
+              break;
+            }
+            default:
+              if ('0' <= *fmt && *fmt <= '9') {
+                if (mode == PRINTF_MODE_PRECISION) {
+                  /* precision specifier */
+                  precision *= 10;
+                  precision += *fmt - '0';
+                } else if (mode == 0 && width == 0 && *fmt == '0') {
+                  /* padding char is zero */
+                  padding = '0';
+                } else {
+                  /* field width */
+                  width *= 10;
+                  width += *fmt - '0';
+                }
+              }
+              break;
+          }
+
+          fmt++;
+        }
 directive_finished:
-      break;
-      
-    default:
-      /* regular character */
-      putc(*fmt);
-      break;
+        break;
+        
+      default:
+        /* regular character */
+        putc(*fmt);
+        break;
     }
 
     fmt++;

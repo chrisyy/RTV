@@ -7,9 +7,9 @@ LD := $(TARGET)-ld
 PROG := rtv
 
 CSRCS := $(shell find . -name *.c)
-ASRCS := $(shell find . -name *.s)
+ASRCS := $(shell find . -name *.S)
 OBJS := $(CSRCS:%.c=%.o)
-OBJS += $(ASRCS:%.s=%.o)
+OBJS += $(ASRCS:%.S=%.o)
 DEPS := $(OBJS:.o=.d)
 
 INC_FLAGS := -Iinclude -Iarch/$(ARCH)/include
@@ -29,7 +29,7 @@ $(PROG): $(OBJS)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.s
+%.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
 iso: 
