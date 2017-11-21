@@ -37,13 +37,13 @@ if (x && y) {
 }
 
 switch (cond) {
-  case x:
-    a++;
-    break;
+case x:
+  a++;
+  break;
 
-  case y:
-    b--;
-    break;
+case y:
+  b--;
+  break;
 }
 
 for (i = 1; i < limit; i++) {
@@ -65,10 +65,41 @@ void foo(uint32_t a, uint32_t b, uint32_t c,
 y = foo(a, b, c,
         d, e);
 
+
+(single space)
 #define XYZ 12
 #define DDDDD (12 * 10)
 
-__asm__ volatile("abc" : y : "a"(x) : z);
+typedef struct _TypeA {
+  ...
+} TypeA;
+
+struct TypeA {
+  int bits : 12;
+  ...
+};
+
+
+__asm__ volatile("abc" : y : "a" (x) : z);
+
 
 Function naming: lower case
-module_action_action(...)
+module_action(...)
+
+Type naming: lower case
+
+Variables defined at the top of its scope:
+foo()
+{
+  int a;
+
+  ...
+
+  if (...) {
+    int b;
+    ...
+    print(b);
+  }
+
+  set(a);
+}

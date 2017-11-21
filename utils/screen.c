@@ -27,7 +27,7 @@
 #define ATTRIBUTE               7
 
 /*  The video memory address. */
-uint8_t *frameBuf = 0xB8000;
+uint8_t *frameBuf = (uint8_t *)0xB8000;
 /*  Save the X position. */
 static uint16_t xpos;
 /*  Save the Y position. */

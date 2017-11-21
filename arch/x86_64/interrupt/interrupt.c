@@ -16,6 +16,7 @@
  */
 
 #include "interrupt.h"
+#include "cpu.h"
 #include "port.h"
 #include "utils/screen.h"
 
@@ -24,22 +25,27 @@ idt_desc IDTR;
 
 extern void *int_table[IDT_ENTRY_NR];
 
-#define idtSetEntry(i, gate_type, handler, idt) \
-do {                                            \
-  uint64_t base = (uint64_t) handler;           \
-  idt[i].offset0 = (uint16_t) base;             \
-  idt[i].selector = 0x8;  /* code */            \
-  idt[i].type = gate_type;                      \
-  idt[i].offset1 = (uint16_t) (base >> 16);     \
-  idt[i].offset2 = (uint32_t) (base >> 32);     \
-  idt[i].reserved = 0;                          \
-} while (0)
+static inline void idt_setEntry(uint16_t index, uint8_t type, void *handler(), idt_entry *idt)
+{
+  uint64_t base = (uint64_t) handler;           
+  idt[index].offset0 = (uint16_t) base;             
+  idt[index].selector = 0x8;  /* code */            
+  idt[index].ist = 0;                      
+  idt[index].zero0 = 0;                      
+  idt[index].type = type;                      
+  idt[index].zero1 = 0;                      
+  idt[index].dpl = 0;                      
+  idt[index].p = 1;                      
+  idt[index].offset1 = (uint16_t) (base >> 16);     
+  idt[index].offset2 = (uint32_t) (base >> 32);     
+  idt[index].reserved = 0;
+}
 
 void idt_init(void)
 {
   uint16_t i;
   for (i = 0; i < IDT_ENTRY_NR; i++)
-    idtSetEntry(i, INTERRUPT_GATE_TYPE, int_table[i], IDT64);
+    idt_setEntry(i, INTERRUPT_GATE_TYPE, int_table[i], IDT64);
 
   IDTR.limit = IDT_ENTRY_NR * sizeof(idt_entry) - 1;
   IDTR.base = (uint64_t) IDT64;
@@ -50,6 +56,16 @@ void idt_init(void)
 void isr_handler(uint64_t irq)
 {
   printf("interrupt %u\n", irq);
+  //TODO: EOI
+}
+
+void pit_init(void)
+{
+  outb(PIT_CMD, 0x34);            /* 8254 (control word) - channel 0, mode 2 */
+
+  /* Set interval timer to interrupt once every 1/HZth second */
+  outb(PIT_CHANNEL0, (PIT_FREQ / HZ) & 0xFF);  /* channel 0 low byte */
+  outb(PIT_CHANNEL0, (PIT_FREQ / HZ) >> 8);    /* channel 0 high byte */
 }
 
 void pic_init(void)
@@ -77,4 +93,5 @@ void interrupt_init(void)
 {
   idt_init();
   pic_init();
+  pit_init();
 }

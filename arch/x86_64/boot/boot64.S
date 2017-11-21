@@ -16,7 +16,6 @@
  */
 
   .section .text
-  .code64
 
   .global _start64
 _start64:

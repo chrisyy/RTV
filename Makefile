@@ -15,7 +15,6 @@ DEPS := $(OBJS:.o=.d)
 INC_FLAGS := -Iinclude -Iarch/$(ARCH)/include
 ISO_DIR := iso
 
-#-z max-page-size may not be needed
 CFLAGS := -ffreestanding -mcmodel=large -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -g -Wall -MMD -lgcc $(INC_FLAGS)
 LDFLAGS := -nostdlib -z max-page-size=4096
 

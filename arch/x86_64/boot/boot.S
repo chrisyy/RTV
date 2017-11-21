@@ -16,6 +16,7 @@
  */
 
 #include "msr.h"
+#include "cpu.h"
 
   .set MAGIC, 0xE85250D6
   .set ARCH, 0x0
@@ -27,11 +28,13 @@
   .comm PDPT, 0x1000
   .comm PDT, 0x1000
 
-stack:
+  .global kernel_stack
+kernel_stack:
   .skip 0x1000
 stack_top:
 
-  .section .rodata
+  .section .data
+  .global GDT64
 GDT64:
   /* null descriptor as required */
   .quad 0
@@ -39,15 +42,20 @@ GDT64:
   .quad 0x00209A0000000000
   /* data */
   .quad 0x0000920000000000
+  /* 4KB GDT */
+  .rept GDT_ENTRY_NR - 3
+  .quad 0
+  .endr
 GDT_ptr:
   .short . - GDT64 - 1
   .quad GDT64
 
+  .section .rodata
 MSG:
   .ascii "Failure: jumping to _start64"
 MSG_LEN:
-  .short . - MSG
-  
+  .long . - MSG
+
   /* multiboot 2 */
   .section .multiboot
 header_start:
@@ -66,7 +74,6 @@ header_end:
   .code32
 
   .global _start
-
 _start:
   movl $stack_top, %esp
   pushl %eax  /* multiboot_magic */
@@ -130,5 +137,4 @@ _start:
 2:
   hlt
   jmp 2b
-
 

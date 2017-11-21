@@ -17,9 +17,7 @@
 
   .section .text
 
-#define INT(n)          \
-  .globl isr##n;        \
-isr##n:                 \
+#define REG_SAVE        \
   pushq %rax;           \
   pushq %rbx;           \
   pushq %rcx;           \
@@ -34,10 +32,10 @@ isr##n:                 \
   pushq %r12;           \
   pushq %r13;           \
   pushq %r14;           \
-  pushq %r15;           \
-  movq $0x##n, %rdi;    \
-  call isr_handler;     \
-  popq %rax;            \
+  pushq %r15;           
+
+
+#define REG_RESTORE     \
   popq %r15;            \
   popq %r14;            \
   popq %r13;            \
@@ -52,7 +50,16 @@ isr##n:                 \
   popq %rdx;            \
   popq %rcx;            \
   popq %rbx;            \
-  popq %rax;            \
+  popq %rax;
+
+
+#define INT(n)          \
+  .global isr##n;        \
+isr##n:                 \
+  REG_SAVE;             \
+  movq $0x##n, %rdi;    \
+  call isr_handler;     \
+  REG_RESTORE;          \
   iretq;
 
 
@@ -316,7 +323,7 @@ INT(ff)
 
 
 #define ENTRY(n) .quad isr##n
-  .globl int_table
+  .global int_table
 int_table:
 ENTRY(0)
 ENTRY(1)

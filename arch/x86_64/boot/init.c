@@ -19,20 +19,20 @@
 #include "multiboot2.h"
 #include "utils/screen.h"
 #include "interrupt.h"
+#include "cpu.h"
 
+tss_t cpuTSS;
+
+extern uint8_t kernel_stack[0x1000];
 
 void kernel_main(uint64_t magic, uint64_t mbi)
 {
   struct multiboot_tag *tag;
-  
+  uint16_t selector;
+
   /* multiboot2 */
   if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
     printf("Invalid magic number: %X\n", (uint32_t)magic);
-    return;
-  }
-
-  if (mbi & 0x7) {
-    printf("mbi not aligned");
     return;
   }
 
@@ -40,33 +40,19 @@ void kernel_main(uint64_t magic, uint64_t mbi)
        tag->type != MULTIBOOT_TAG_TYPE_END;
        tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
                                             + ((tag->size + 7) & ~7))) {
-    printf("tag %X, size %d\n", tag->type, tag->size);
     switch (tag->type) {
       case MULTIBOOT_TAG_TYPE_CMDLINE:
-        printf("CMD: %s\n", ((struct multiboot_tag_string *) tag)->string);
-        break;
-
-      case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME:
-        printf ("Boot loader name = %s\n",
-                ((struct multiboot_tag_string *) tag)->string);
+        //printf("CMD: %s\n", ((struct multiboot_tag_string *) tag)->string);
         break;
 
       case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
-        printf ("mem_lower = %uKB, mem_upper = %uKB\n",
+        printf("mem_lower = %uKB, mem_upper = %uKB\n",
                 ((struct multiboot_tag_basic_meminfo *) tag)->mem_lower,
                 ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper);
         break;
 
-      case MULTIBOOT_TAG_TYPE_BOOTDEV:
-        printf ("Boot device 0x%x,%u,%u\n",
-                ((struct multiboot_tag_bootdev *) tag)->biosdev,
-                ((struct multiboot_tag_bootdev *) tag)->slice,
-                ((struct multiboot_tag_bootdev *) tag)->part);
-        break;
       case MULTIBOOT_TAG_TYPE_MMAP: {
         multiboot_memory_map_t *mmap;
-     
-        printf("mmap\n");
      
         for (mmap = ((struct multiboot_tag_mmap *) tag)->entries;
              (multiboot_uint8_t *) mmap
@@ -99,6 +85,12 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   /* initialize IDT */
   interrupt_init();
+
+  cpuTSS.rsp[0] = ((uint64_t) kernel_stack) + 0x1000;
+  selector = alloc_tss_desc(&cpuTSS);
+  load_tr(selector);
+
+  interrupt_enable();
 
   while(1);
 }
