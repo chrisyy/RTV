@@ -22,9 +22,14 @@ int *ptr = 0xFC01;
 TypeA X = (TypeA) Y;
 
 TypeABCDEFGHIJKLMN X
-  = Y;
+  = 18204850238;
 
 TypeA *X = (TypeA *) Y;
+*Y = 38054;
+
+when there is only one line in a if, no brackets:
+if (x)
+  foo();
 
 if (x) {
   ...
@@ -82,14 +87,17 @@ struct TypeA {
 
 __asm__ volatile("abc" : y : "a" (x) : z);
 
+__asm__ volatile("abc" : y 
+                 : "a" (x) : z);
+
 
 Function naming: lower case
-module_action(...)
+int module_action(...)
 
 Type naming: lower case
 
 Variables defined at the top of its scope:
-foo()
+int foo()
 {
   int a;
 
@@ -103,3 +111,5 @@ foo()
 
   set(a);
 }
+
+int *memcpy();

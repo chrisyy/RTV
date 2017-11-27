@@ -17,7 +17,7 @@
 
 #include "interrupt.h"
 #include "cpu.h"
-#include "port.h"
+#include "io.h"
 #include "utils/screen.h"
 
 idt_entry IDT64[IDT_ENTRY_NR] __attribute__ ((aligned (0x1000)));
@@ -63,6 +63,7 @@ void pit_init(void)
 {
   outb(PIT_CMD, 0x34);            /* 8254 (control word) - channel 0, mode 2 */
 
+  //TODO: set to one-shot
   /* Set interval timer to interrupt once every 1/HZth second */
   outb(PIT_CHANNEL0, (PIT_FREQ / HZ) & 0xFF);  /* channel 0 low byte */
   outb(PIT_CHANNEL0, (PIT_FREQ / HZ) >> 8);    /* channel 0 high byte */

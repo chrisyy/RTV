@@ -38,10 +38,10 @@ iso:
 	grub-mkrescue -o $(PROG).iso $(ISO_DIR)
 
 run:
-	qemu-system-x86_64 -cdrom $(PROG).iso -m 4G &
+	qemu-system-x86_64 -cdrom $(PROG).iso -m 4G -smp 2 &
 
 debug:
-	qemu-system-x86_64 -s -S -cdrom $(PROG).iso -m 4G &
+	qemu-system-x86_64 -s -S -cdrom $(PROG).iso -m 4G -smp 2 &
 
 clean:
 	rm -rf $(OBJS) $(PROG) $(DEPS) $(PROG).iso $(ISO_DIR)

@@ -26,7 +26,9 @@
 
   .comm PML4T, 0x1000
   .comm PDPT, 0x1000
-  .comm PDT, 0x1000
+  .comm PDT0, 0x1000
+  .comm PDT1, 0x1000
+  .comm PT, 0x1000
 
   .global kernel_stack
 kernel_stack:
@@ -89,16 +91,29 @@ _start:
   orl $0x3, %eax  /* present+write bits */
   movl %eax, PML4T
 
-  movl $PDT, %eax
+  movl $PDT0, %eax
   orl $0x3, %eax
   movl %eax, PDPT
 
   movl $0x83, %eax  /* 2MB page */
-  movl %eax, PDT
+  movl %eax, PDT0
 
   movl $0x200000, %eax
   orl $0x83, %eax   /* 2MB page */
-  movl %eax, PDT+8
+  movl %eax, PDT0 + 8
+
+  /* set up 4KB identity mapping for LAPIC (0xFEE00000) */
+  // TODO: remove hard-coded addr
+  movl $PDT1, %eax
+  orl $0x3, %eax
+  movl %eax, PDPT + 3 * 8
+
+  movl $PT, %eax
+  orl $0x3, %eax
+  movl %eax, PDT1 + 503 * 8
+
+  movl $0x1B, %eax  /* 4KB page, uncacheable, write-through */
+  movl %eax, PT
 
   movl $PML4T, %eax
   movl %eax, %cr3 

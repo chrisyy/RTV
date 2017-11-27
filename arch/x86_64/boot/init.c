@@ -15,14 +15,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "types.h"
 #include "multiboot2.h"
 #include "utils/screen.h"
 #include "interrupt.h"
 #include "cpu.h"
+#include "acpi.h"
 
+/* percpu */
 tss_t cpuTSS;
 
+/* percpu */
 extern uint8_t kernel_stack[0x1000];
 
 void kernel_main(uint64_t magic, uint64_t mbi)
@@ -85,6 +87,10 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   /* initialize IDT */
   interrupt_init();
+
+  ACPI_init();
+
+  //LAPIC_init();
 
   cpuTSS.rsp[0] = ((uint64_t) kernel_stack) + 0x1000;
   selector = alloc_tss_desc(&cpuTSS);
