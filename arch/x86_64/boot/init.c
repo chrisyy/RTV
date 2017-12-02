@@ -20,12 +20,13 @@
 #include "interrupt.h"
 #include "cpu.h"
 #include "acpi.h"
+#include "vm.h"
 
 /* percpu */
-tss_t cpuTSS;
+tss_t cpu_tss;
 
 /* percpu */
-extern uint8_t kernel_stack[0x1000];
+extern uint8_t kernel_stack[PG_SIZE];
 
 void kernel_main(uint64_t magic, uint64_t mbi)
 {
@@ -85,15 +86,16 @@ void kernel_main(uint64_t magic, uint64_t mbi)
     }
   }
 
-  /* initialize IDT */
   interrupt_init();
 
-  ACPI_init();
+  vm_init();
 
-  //LAPIC_init();
+  //acpi_init();
 
-  cpuTSS.rsp[0] = ((uint64_t) kernel_stack) + 0x1000;
-  selector = alloc_tss_desc(&cpuTSS);
+  //lapic_init();
+
+  cpu_tss.rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
+  selector = alloc_tss_desc(&cpu_tss);
   load_tr(selector);
 
   interrupt_enable();

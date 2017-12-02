@@ -18,15 +18,15 @@
 #include "cpu.h"
 #include "helper.h"
 
-extern seg_desc GDT64[GDT_ENTRY_NR];
+extern seg_desc gdt64[GDT_ENTRY_NR];
 
 uint16_t alloc_tss_desc(tss_t *tss_p)
 {
   uint16_t i; 
   /* skip the first 3 used entries */
   for (i = 3; i < GDT_ENTRY_NR; i++) {
-    if (!GDT64[i].p) {
-      tss_desc *entry = (tss_desc *) &GDT64[i];
+    if (!gdt64[i].p) {
+      tss_desc *entry = (tss_desc *) &gdt64[i];
       entry->limit0 = sizeof(tss_t);
       entry->limit1 = 0;
       entry->base0 = ((uint64_t) tss_p) & 0xFFFFFF;

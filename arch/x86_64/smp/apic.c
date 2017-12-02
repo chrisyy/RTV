@@ -18,20 +18,20 @@
 #include "apic.h"
 #include "io.h"
 
-uint8_t *LAPIC_addr;
+uint8_t *lapic_addr;
 
-static inline void LAPIC_write32(uint16_t offset, uint32_t data)
+static inline void lapic_write32(uint16_t offset, uint32_t data)
 {
-  mmio_write32(LAPIC_addr + offset, data);
+  mmio_write32(lapic_addr + offset, data);
 }
 
-void LAPIC_init(void) 
+void lapic_init(void) 
 {
-  LAPIC_write32(LAPIC_TPR, 0x00);      /* task priority = 0x0 */
-  LAPIC_write32(LAPIC_LVTT, 0x10000);  /* disable timer interrupt */
-  LAPIC_write32(LAPIC_LVTPC, 0x10000); /* disable PMC interrupt */
-  LAPIC_write32(LAPIC_LVT0, 0x08700);  /* enable normal external interrupts */
-  LAPIC_write32(LAPIC_LVT1, 0x00400);  /* enable NMI */
-  LAPIC_write32(LAPIC_LVTE, 0x10000);  /* disable error interrupts */
-  LAPIC_write32(LAPIC_SPIV, 0x0010F);  /* enable APIC: spurious vector = 0xF */
+  lapic_write32(LAPIC_TPR, 0x00);      /* task priority = 0x0 */
+  lapic_write32(LAPIC_LVTT, 0x10000);  /* disable timer interrupt */
+  lapic_write32(LAPIC_LVTPC, 0x10000); /* disable PMC interrupt */
+  lapic_write32(LAPIC_LVT0, 0x08700);  /* enable normal external interrupts */
+  lapic_write32(LAPIC_LVT1, 0x00400);  /* enable NMI */
+  lapic_write32(LAPIC_LVTE, 0x10000);  /* disable error interrupts */
+  lapic_write32(LAPIC_SPIV, 0x0010F);  /* enable APIC: spurious vector = 0xF */
 }

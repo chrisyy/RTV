@@ -23,11 +23,11 @@
 uint8_t g_acpiCpuCount;
 uint8_t g_acpiCpuIds[MAX_CPU_COUNT];
 
-static ACPI_MADT *s_madt;
+static acpi_madt_t *g_madt;
 
-static void AcpiParseApic(ACPI_MADT *madt)
+static void acpi_parse_apic(acpi_madt_t *madt)
 {
-  s_madt = madt;
+  g_madt = madt;
 
   //g_localApicAddr = (uint8_t *)madt->localApicAddr;
 
@@ -35,135 +35,119 @@ static void AcpiParseApic(ACPI_MADT *madt)
   uint8_t *end = (uint8_t *) madt + madt->header.length;
 
   while (p < end) {
-    APIC_header *header = (APIC_header *) p;
+    apic_header_t *header = (apic_header_t *) p;
     uint8_t type = header->type;
     uint8_t length = header->length;
 
     if (type == APIC_TYPE_LAPIC) {
-        APIC_LAPIC *s = (APIC_LAPIC *) p;
+      apic_lapic_t *s = (apic_lapic_t *) p;
 
-        printf("Found CPU: %d %d %x\n", s->processor_id, s->apic_id, s->flags);
-        if (g_acpiCpuCount < MAX_CPU_COUNT)
-        {
-            g_acpiCpuIds[g_acpiCpuCount] = s->apic_id;
-            ++g_acpiCpuCount;
-        }
+      printf("Found CPU: %d %d %x\n", s->processor_id, s->apic_id, s->flags);
+      if (g_acpiCpuCount < MAX_CPU_COUNT) {
+        g_acpiCpuIds[g_acpiCpuCount] = s->apic_id;
+        ++g_acpiCpuCount;
+      }
     }
     else if (type == APIC_TYPE_IOAPIC) {
-        APIC_IOAPIC *s = (APIC_IOAPIC *) p;
+      apic_ioapic_t *s = (apic_ioapic_t *) p;
 
-        printf("Found I/O APIC: %d 0x%08x %d\n", s->id, s->address, s->GSI_base);
-        //g_ioApicAddr = (uint8_t *)s->ioApicAddress;
+      printf("Found I/O APIC: %d 0x%08x %d\n", s->id, s->address, s->gsi_base);
+      //g_ioApicAddr = (uint8_t *)s->ioApicAddress;
     }
     else if (type == APIC_TYPE_INTERRUPT_OVERRIDE) {
-        APIC_InterruptOverride *s = (APIC_InterruptOverride *) p;
+      apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
 
-        printf("Found Interrupt Override: %d %d %d 0x%04x\n", s->bus, s->source, s->interrupt, s->flags);
+      printf("Found Interrupt Override: %d %d %d 0x%04x\n", s->bus, s->source, s->interrupt, s->flags);
     }
-    else {
-        printf("Unknown APIC structure %d\n", type);
-    }
+    else 
+      printf("Unknown APIC structure %d\n", type);
 
     p += length;
   }
 }
 
-static void AcpiParseDT(ACPI_header *header)
+static void acpi_parse_dt(acpi_header_t *header)
 {
-    uint32_t signature = header->signature;
+  uint32_t signature = header->signature;
 
-    char sigStr[5];
-    memcpy(sigStr, &signature, 4);
-    sigStr[4] = 0;
-    printf("%s 0x%x\n", sigStr, signature);
+  char sigstr[5];
+  memcpy(sigstr, &signature, 4);
+  sigstr[4] = 0;
+  printf("%s 0x%x\n", sigstr, signature);
 
-    if (signature == 0x43495041) {
-        AcpiParseApic((ACPI_MADT *) header);
-    }
+  /* "APIC" */
+  if (signature == 0x43495041) 
+    acpi_parse_apic((acpi_madt_t *) header);
 }
 
-static void AcpiParseRsdt(ACPI_header *rsdt)
+static void acpi_parse_rsdt(acpi_header_t *rsdt)
 {
-    uint32_t *p = (uint32_t *)(rsdt + 1);
-    uint32_t *end = (uint32_t *)((uint8_t*)rsdt + rsdt->length);
+  //TODO: map address
+  uint32_t *p = (uint32_t *) (rsdt + 1);
+  uint32_t *end = (uint32_t *) ((uint8_t *) rsdt + rsdt->length);
 
-    while (p < end)
-    {
-        uint32_t address = *p++;
-        printf("SDT addr: %X\n", address);
-        AcpiParseDT((ACPI_header *) address);
-    }
+  while (p < end) {
+    uint64_t address = (uint64_t) *p++;
+    printf("SDT addr: %X\n", address);
+    acpi_parse_dt((acpi_header_t *) address);
+  }
 }
 
-static void AcpiParseXsdt(ACPI_header *xsdt)
+static void acpi_parse_xsdt(acpi_header_t *xsdt)
 {
-    uint64_t *p = (uint64_t *)(xsdt + 1);
-    uint64_t *end = (uint64_t *)((uint8_t*)xsdt + xsdt->length);
+  uint64_t *p = (uint64_t *) (xsdt + 1);
+  uint64_t *end = (uint64_t *) ((uint8_t *) xsdt + xsdt->length);
 
-    while (p < end)
-    {
-        uint64_t address = *p++;
-        AcpiParseDT((ACPI_header *) address);
-    }
+  while (p < end) {
+    uint64_t address = *p++;
+    acpi_parse_dt((acpi_header_t *) address);
+  }
 }
 
-static bool AcpiParseRsdp(uint8_t *p)
+static bool acpi_parse_rsdp(uint8_t *p)
 {
-    // Parse Root System Description Pointer
-    printf("RSDP found\n");
+  // Parse Root System Description Pointer
+  printf("RSDP found\n");
 
-    // Verify checksum
-    uint8_t sum = 0;
-    for (uint8_t i = 0; i < 20; ++i)
-    {
-        sum += p[i];
-    }
+  // Verify checksum
+  uint8_t sum = 0;
+  for (uint8_t i = 0; i < 20; ++i) 
+    sum += p[i];
 
-    if (sum)
-    {
-        printf("Checksum failed\n");
-        return false;
-    }
-    // Print OEM
-    char oem[7];
-    memcpy(oem, p + 9, 6);
-    oem[6] = '\0';
-    printf("OEM = %s\n", oem);
+  if (sum) {
+    printf("Checksum failed\n");
+    return false;
+  }
+  // Print OEM
+  char oem[7];
+  memcpy(oem, p + 9, 6);
+  oem[6] = '\0';
+  printf("OEM = %s\n", oem);
 
-    // Check version
-    uint8_t revision = p[15];
-    if (revision == 0)
-    {
-        printf("Version 1\n");
+  // Check version
+  uint8_t revision = p[15];
+  if (revision == 0) {
+    printf("Version 1\n");
 
-        uint32_t rsdtAddr = *(uint32_t *)(p + 16);
-        AcpiParseRsdt((ACPI_header *)rsdtAddr);
-    }
-    else if (revision == 2)
-    {
-        printf("Version 2\n");
+    uint64_t rsdt_addr = (uint64_t) (*(uint32_t *) (p + 16));
+    acpi_parse_rsdt((acpi_header_t *) rsdt_addr);
+  } else if (revision == 2) {
+    printf("Version 2\n");
 
-        uint32_t rsdtAddr = *(uint32_t *)(p + 16);
-        uint64_t xsdtAddr = *(uint64_t *)(p + 24);
+    uint64_t rsdt_addr = (uint64_t) (*(uint32_t *) (p + 16));
+    uint64_t xsdt_addr = *(uint64_t *) (p + 24);
 
-        if (xsdtAddr)
-        {
-            AcpiParseXsdt((ACPI_header *) xsdtAddr);
-        }
-        else
-        {
-            AcpiParseRsdt((ACPI_header *) rsdtAddr);
-        }
-    }
+    if (xsdt_addr)
+      acpi_parse_xsdt((acpi_header_t *) xsdt_addr);
     else
-    {
-        printf("Unsupported ACPI version %d\n", revision);
-    }
+      acpi_parse_rsdt((acpi_header_t *) rsdt_addr);
+  } else
+    printf("Unsupported ACPI version %d\n", revision);
 
-    return true;
+  return true;
 }
 
-void ACPI_init(void)
+void acpi_init(void)
 {
   // TODO - Search Extended BIOS Area
 
@@ -176,7 +160,7 @@ void ACPI_init(void)
 
     /* "RSD PTR" */
     if (signature == 0x2052545020445352) {
-      if (AcpiParseRsdp(p)) 
+      if (acpi_parse_rsdp(p)) 
           break;
     }
 
@@ -186,31 +170,27 @@ void ACPI_init(void)
   printf("Can't find RSDP\n");
 }
 
-uint8_t AcpiRemapIrq(uint8_t irq)
+uint8_t acpi_irq_map(uint8_t irq)
 {
-    ACPI_MADT *madt = s_madt;
+  acpi_madt_t *madt = g_madt;
 
-    uint8_t *p = (uint8_t *)(madt + 1);
-    uint8_t *end = (uint8_t *)madt + madt->header.length;
+  uint8_t *p = (uint8_t *) (madt + 1);
+  uint8_t *end = (uint8_t *) madt + madt->header.length;
 
-    while (p < end)
-    {
-        APIC_header *header = (APIC_header *)p;
-        uint8_t type = header->type;
-        uint8_t length = header->length;
+  while (p < end) {
+    apic_header_t *header = (apic_header_t *) p;
+    uint8_t type = header->type;
+    uint8_t length = header->length;
 
-        if (type == APIC_TYPE_INTERRUPT_OVERRIDE)
-        {
-            APIC_InterruptOverride *s = (APIC_InterruptOverride *)p;
+    if (type == APIC_TYPE_INTERRUPT_OVERRIDE) {
+      apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
 
-            if (s->source == irq)
-            {
-                return s->interrupt;
-            }
-        }
-
-        p += length;
+      if (s->source == irq)
+        return s->interrupt;
     }
 
-    return irq;
+    p += length;
+  }
+
+  return irq;
 }

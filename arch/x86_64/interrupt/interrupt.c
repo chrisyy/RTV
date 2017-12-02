@@ -20,12 +20,12 @@
 #include "io.h"
 #include "utils/screen.h"
 
-idt_entry IDT64[IDT_ENTRY_NR] __attribute__ ((aligned (0x1000)));
-idt_desc IDTR;
+idt_entry idt64[IDT_ENTRY_NR] ALIGNED(PG_SIZE);
+idt_desc idtr;
 
 extern void *int_table[IDT_ENTRY_NR];
 
-static inline void idt_setEntry(uint16_t index, uint8_t type, void *handler(), idt_entry *idt)
+static inline void idt_set_entry(uint16_t index, uint8_t type, void *handler(), idt_entry *idt)
 {
   uint64_t base = (uint64_t) handler;           
   idt[index].offset0 = (uint16_t) base;             
@@ -45,12 +45,12 @@ void idt_init(void)
 {
   uint16_t i;
   for (i = 0; i < IDT_ENTRY_NR; i++)
-    idt_setEntry(i, INTERRUPT_GATE_TYPE, int_table[i], IDT64);
+    idt_set_entry(i, INTERRUPT_GATE_TYPE, int_table[i], idt64);
 
-  IDTR.limit = IDT_ENTRY_NR * sizeof(idt_entry) - 1;
-  IDTR.base = (uint64_t) IDT64;
+  idtr.limit = IDT_ENTRY_NR * sizeof(idt_entry) - 1;
+  idtr.base = (uint64_t) idt64;
 
-  __asm__ volatile("lidt %0" : : "m" (IDTR) : "memory");
+  __asm__ volatile("lidt %0" : : "m" (idtr) : "memory");
 }
 
 void isr_handler(uint64_t irq)

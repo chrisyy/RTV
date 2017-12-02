@@ -229,8 +229,6 @@ void printf(const char *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
-  //spinlock_lock(&screen_lock);
   vprintf(_putchar, fmt, args);
-  //spinlock_unlock(&screen_lock);
   va_end(args);
 }

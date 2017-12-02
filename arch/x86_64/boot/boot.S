@@ -24,10 +24,10 @@
   .section .bss
   .align 0x1000
 
-  .comm PML4T, 0x1000
-  .comm PDPT, 0x1000
-  .comm PDT0, 0x1000
-  .comm PDT1, 0x1000
+  .comm pml4t, 0x1000
+  .comm pdpt, 0x1000
+  .comm pdt, 0x1000
+  .comm pdt1, 0x1000
   .comm PT, 0x1000
 
   .global kernel_stack
@@ -36,8 +36,8 @@ kernel_stack:
 stack_top:
 
   .section .data
-  .global GDT64
-GDT64:
+  .global gdt64
+gdt64:
   /* null descriptor as required */
   .quad 0
   /* code */
@@ -48,15 +48,15 @@ GDT64:
   .rept GDT_ENTRY_NR - 3
   .quad 0
   .endr
-GDT_ptr:
-  .short . - GDT64 - 1
-  .quad GDT64
+gdt_ptr:
+  .short . - gdt64 - 1
+  .quad gdt64
 
   .section .rodata
-MSG:
+msg:
   .ascii "Failure: jumping to _start64"
-MSG_LEN:
-  .long . - MSG
+msg_len:
+  .long . - msg
 
   /* multiboot 2 */
   .section .multiboot
@@ -86,36 +86,32 @@ _start:
   andl $0x7FFFFFFF, %eax
   movl %eax, %cr0
 
-  /* set up first 4MB identity mapping */
-  movl $PDPT, %eax
+  /* set up first 2MB identity mapping */
+  movl $pdpt, %eax
   orl $0x3, %eax  /* present+write bits */
-  movl %eax, PML4T
+  movl %eax, pml4t
 
-  movl $PDT0, %eax
+  movl $pdt, %eax
   orl $0x3, %eax
-  movl %eax, PDPT
+  movl %eax, pdpt
 
   movl $0x83, %eax  /* 2MB page */
-  movl %eax, PDT0
-
-  movl $0x200000, %eax
-  orl $0x83, %eax   /* 2MB page */
-  movl %eax, PDT0 + 8
+  movl %eax, pdt
 
   /* set up 4KB identity mapping for LAPIC (0xFEE00000) */
-  // TODO: remove hard-coded addr
-  movl $PDT1, %eax
+  // TODO: remove hard-coded addr, also set up mapping in C
+  movl $pdt1, %eax
   orl $0x3, %eax
-  movl %eax, PDPT + 3 * 8
+  movl %eax, pdpt + 3 * 8
 
   movl $PT, %eax
   orl $0x3, %eax
-  movl %eax, PDT1 + 503 * 8
+  movl %eax, pdt1 + 503 * 8
 
   movl $0x1B, %eax  /* 4KB page, uncacheable, write-through */
   movl %eax, PT
 
-  movl $PML4T, %eax
+  movl $pml4t, %eax
   movl %eax, %cr3 
 
   /* enable PAE paging */
@@ -134,15 +130,15 @@ _start:
   orl $0x80000000, %eax
   movl %eax, %cr0 
 
-  lgdt GDT_ptr
+  lgdt gdt_ptr
   ljmp $0x8, $_start64
   
   /* error */
   cli
 
   movb $0x2F, %ah
-  movl MSG_LEN, %ecx
-  movl $MSG, %esi
+  movl msg_len, %ecx
+  movl $msg, %esi
   movl $0xB8000, %edi
 1:
   lodsb

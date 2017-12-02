@@ -19,15 +19,15 @@ int32_t, uint8_t, ...
 (use upper case for constant hex numbers)
 int *ptr = 0xFC01;
 
-TypeA X = (TypeA) Y;
+type_a X = (type_a) Y;
 
-TypeABCDEFGHIJKLMN X
+type_ljiemsenoicpeo X
   = 18204850238;
 
-TypeA *X = (TypeA *) Y;
+type_a *X = (type_a *) Y;
 *Y = 38054;
 
-when there is only one line in a if, no brackets:
+when there is only one line in a if/else/for/while, no brackets, in two separate lines:
 if (x)
   foo();
 
@@ -59,6 +59,7 @@ do {
   ...
 } while (x);
 
+Function:
 y = foo(x);
 
 void foo(uint32_t a, uint32_t b, uint32_t c,
@@ -70,28 +71,31 @@ void foo(uint32_t a, uint32_t b, uint32_t c,
 y = foo(a, b, c,
         d, e);
 
+declaration: with argument names
+extern void foo(int a, int b);
 
-(single space)
+MACRO: capital letter
 #define XYZ 12
 #define DDDDD (12 * 10)
 
-typedef struct _TypeA {
-  ...
-} TypeA;
+uint8_t table __attribute__ ((aligned (8)));
 
-struct TypeA {
+typedef struct _type_a {
+  ...
+} type_a_t;
+
+struct type_a {
   int bits : 12;
   ...
 };
-
 
 __asm__ volatile("abc" : y : "a" (x) : z);
 
 __asm__ volatile("abc" : y 
                  : "a" (x) : z);
 
-
-Function naming: lower case
+Function naming: lower case 
+for external-facing interface of a module, add the module name:
 int module_action(...)
 
 Type naming: lower case

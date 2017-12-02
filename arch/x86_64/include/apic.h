@@ -28,4 +28,6 @@
 #define LAPIC_TCCR  0x390
 #define LAPIC_TDCR  0x3E0
 
+extern void lapic_init(void);
+
 #endif

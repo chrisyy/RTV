@@ -16,8 +16,46 @@
  */
 
 #include "vm.h"
+#include "utils/bits.h"
 
-void *map_virtual_page(uint64_t frame)
+#define VM_ENTRIES (PG_SIZE / sizeof(uint64_t))
+
+uint64_t kernel_pgt[VM_ENTRIES] ALIGNED(PG_SIZE);
+
+void *vm_map_page(uint64_t frame)
 {
+  uint64_t i;
+  void *va;
 
+  for (i = 0; i < VM_ENTRIES; i++) {
+    if (!get_bit64(kernel_pgt[i], PGT_P)) {
+      kernel_pgt[i] = frame;
+      va = (void *) (KERNEL_MAPPING_BASE + (i << PG_BITS));
+      invalidate_page(va);
+
+      return va;
+    } 
+  }
+    
+  return NULL;
+}
+
+void vm_init(void)
+{
+  uint16_t i;
+  uint64_t entry;
+  uint64_t *pdpt, *pdt;
+  extern uint64_t pml4t[];
+
+  for (i = 0; i < VM_ENTRIES; i++)
+    kernel_pgt[i] = 0;
+
+  /* set up 2MB virtual memory for kernel mapping */
+  entry = (KERNEL_MAPPING_BASE & 0xFF8000000000) >> 39;
+  pdpt = (uint64_t *) pml4t[entry];
+  entry = (KERNEL_MAPPING_BASE & 0x7FC0000000) >> 30;
+  pdt = (uint64_t *) pdpt[entry];
+  entry = (KERNEL_MAPPING_BASE & 0x3FE00000) >> 21;
+  pdt[entry] = (uint64_t) kernel_pgt;
+  invalidate_page((void *) KERNEL_MAPPING_BASE);
 }
