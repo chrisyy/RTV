@@ -90,7 +90,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   vm_init();
 
-  //acpi_init();
+  acpi_init();
 
   //lapic_init();
 

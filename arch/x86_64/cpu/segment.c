@@ -43,6 +43,6 @@ uint16_t alloc_tss_desc(tss_t *tss_p)
     }
   }
 
-  panic("out of GDT entries\n");
+  panic(__func__, "out of GDT entries");
   return 0;
 }

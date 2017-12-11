@@ -18,7 +18,6 @@
 #include <stdarg.h>
 #include "types.h"
 
-
 /*  The number of columns. */
 #define COLUMNS                 80
 /*  The number of lines. */

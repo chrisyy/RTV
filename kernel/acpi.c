@@ -18,6 +18,8 @@
 #include "acpi.h"
 #include "asm/asm-string.h"
 #include "utils/screen.h"
+#include "helper.h"
+#include "vm.h"
 
 #define MAX_CPU_COUNT 100
 uint8_t g_acpiCpuCount;
@@ -67,7 +69,8 @@ static void acpi_parse_apic(acpi_madt_t *madt)
 }
 
 static void acpi_parse_dt(acpi_header_t *header)
-{
+{ 
+  //TODO: map virtual addr
   uint32_t signature = header->signature;
 
   char sigstr[5];
@@ -80,28 +83,44 @@ static void acpi_parse_dt(acpi_header_t *header)
     acpi_parse_apic((acpi_madt_t *) header);
 }
 
-static void acpi_parse_rsdt(acpi_header_t *rsdt)
+static void acpi_parse_rsdt(uint32_t rsdt)
 {
-  //TODO: map address
-  uint32_t *p = (uint32_t *) (rsdt + 1);
-  uint32_t *end = (uint32_t *) ((uint8_t *) rsdt + rsdt->length);
+  /* map two pages in case RSDT spans across page boundary */
+  uint32_t page_start = (rsdt >> PG_BITS) << PG_BITS;
+  uint8_t *va = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
+  uint8_t *rsdt_p = va + rsdt - page_start;
+  uint32_t *sdt = (uint32_t *) (rsdt_p + sizeof(acpi_header_t));
+  uint32_t *end = (uint32_t *) (rsdt_p + ((acpi_header_t *) rsdt_p)->length);
 
-  while (p < end) {
-    uint64_t address = (uint64_t) *p++;
-    printf("SDT addr: %X\n", address);
+  if ((uint8_t *) end > va + 2 * PG_SIZE)
+    panic(__func__, "RSDT is too large");
+
+  while (sdt < end) {
+    uint64_t address = (uint64_t) *sdt++;
     acpi_parse_dt((acpi_header_t *) address);
   }
+
+  vm_unmap_pages(va, 2);
 }
 
-static void acpi_parse_xsdt(acpi_header_t *xsdt)
+static void acpi_parse_xsdt(uint64_t xsdt)
 {
-  uint64_t *p = (uint64_t *) (xsdt + 1);
-  uint64_t *end = (uint64_t *) ((uint8_t *) xsdt + xsdt->length);
+  /* map two pages in case XSDT spans across page boundary */
+  uint64_t page_start = (xsdt >> PG_BITS) << PG_BITS;
+  uint8_t *va = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
+  uint8_t *xsdt_p = va + xsdt - page_start;
+  uint64_t *sdt = (uint64_t *) (xsdt_p + sizeof(acpi_header_t));
+  uint64_t *end = (uint64_t *) (xsdt_p + ((acpi_header_t *) xsdt_p)->length);
 
-  while (p < end) {
-    uint64_t address = *p++;
+  if ((uint8_t *) end > va + 2 * PG_SIZE)
+    panic(__func__, "XSDT is too large");
+
+  while (sdt < end) {
+    uint64_t address = *sdt++;
     acpi_parse_dt((acpi_header_t *) address);
   }
+
+  vm_unmap_pages(va, 2);
 }
 
 static bool acpi_parse_rsdp(uint8_t *p)
@@ -129,18 +148,18 @@ static bool acpi_parse_rsdp(uint8_t *p)
   if (revision == 0) {
     printf("Version 1\n");
 
-    uint64_t rsdt_addr = (uint64_t) (*(uint32_t *) (p + 16));
-    acpi_parse_rsdt((acpi_header_t *) rsdt_addr);
+    uint32_t rsdt_addr = *(uint32_t *) (p + 16); 
+    acpi_parse_rsdt(rsdt_addr);
   } else if (revision == 2) {
     printf("Version 2\n");
 
-    uint64_t rsdt_addr = (uint64_t) (*(uint32_t *) (p + 16));
+    uint32_t rsdt_addr = *(uint32_t *) (p + 16);
     uint64_t xsdt_addr = *(uint64_t *) (p + 24);
 
     if (xsdt_addr)
-      acpi_parse_xsdt((acpi_header_t *) xsdt_addr);
+      acpi_parse_xsdt(xsdt_addr);
     else
-      acpi_parse_rsdt((acpi_header_t *) rsdt_addr);
+      acpi_parse_rsdt(rsdt_addr);
   } else
     printf("Unsupported ACPI version %d\n", revision);
 
@@ -149,7 +168,7 @@ static bool acpi_parse_rsdp(uint8_t *p)
 
 void acpi_init(void)
 {
-  // TODO - Search Extended BIOS Area
+  // TODO - Search Extended BIOS Data Area
 
   /* Search main BIOS area below 1MB */
   uint8_t *p = (uint8_t *) 0x000e0000;

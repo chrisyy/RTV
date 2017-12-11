@@ -56,6 +56,7 @@ void idt_init(void)
 void isr_handler(uint64_t irq)
 {
   printf("interrupt %u\n", irq);
+  while (1);
   //TODO: EOI
 }
 

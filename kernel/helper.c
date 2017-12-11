@@ -19,9 +19,9 @@
 #include "cpu.h"
 #include "utils/screen.h"
 
-void panic(const char *msg)
+void panic(const char *func, const char *msg)
 {
   interrupt_disable();
-  printf("%s", msg);
+  printf("%s: %s\n", func, msg);
   halt();
 }
