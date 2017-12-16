@@ -3,7 +3,10 @@
 
 #include "types.h"
 
-/* bits of page table entry */
+#define PG_BITS 12
+#define PG_SIZE (1 << PG_BITS)
+
+/* flags of page table entry */
 #define PGT_P   0x1
 #define PGT_RW  0x2
 #define PGT_US  0x4

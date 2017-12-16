@@ -44,7 +44,7 @@ static void acpi_parse_apic(acpi_madt_t *madt)
     if (type == APIC_TYPE_LAPIC) {
       apic_lapic_t *s = (apic_lapic_t *) p;
 
-      printf("Found CPU: %d %d %x\n", s->processor_id, s->apic_id, s->flags);
+      //printf("Found CPU: %d %d %x\n", s->processor_id, s->apic_id, s->flags);
       if (g_acpiCpuCount < MAX_CPU_COUNT) {
         g_acpiCpuIds[g_acpiCpuCount] = s->apic_id;
         ++g_acpiCpuCount;
@@ -53,16 +53,18 @@ static void acpi_parse_apic(acpi_madt_t *madt)
     else if (type == APIC_TYPE_IOAPIC) {
       apic_ioapic_t *s = (apic_ioapic_t *) p;
 
-      printf("Found I/O APIC: %d 0x%08x %d\n", s->id, s->address, s->gsi_base);
+      //printf("Found I/O APIC: %d 0x%08x %d\n", s->id, s->address, s->gsi_base);
       //g_ioApicAddr = (uint8_t *)s->ioApicAddress;
     }
     else if (type == APIC_TYPE_INTERRUPT_OVERRIDE) {
       apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
 
-      printf("Found Interrupt Override: %d %d %d 0x%04x\n", s->bus, s->source, s->interrupt, s->flags);
+      //printf("Found Interrupt Override: %d %d %d 0x%04x\n", s->bus, s->source, s->interrupt, s->flags);
     }
-    else 
-      printf("Unknown APIC structure %d\n", type);
+    else {
+      //TODO
+      //printf("Un-supported APIC structure %d\n", type);
+    }
 
     p += length;
   }
@@ -70,13 +72,12 @@ static void acpi_parse_apic(acpi_madt_t *madt)
 
 static void acpi_parse_dt(acpi_header_t *header)
 { 
-  //TODO: map virtual addr
   uint32_t signature = header->signature;
 
-  char sigstr[5];
-  memcpy(sigstr, &signature, 4);
-  sigstr[4] = 0;
-  printf("%s 0x%x\n", sigstr, signature);
+  //char sigstr[5];
+  //memcpy(sigstr, &signature, 4);
+  //sigstr[4] = 0;
+  //printf("%s 0x%x\n", sigstr, signature);
 
   /* "APIC" */
   if (signature == 0x43495041) 
@@ -97,7 +98,11 @@ static void acpi_parse_rsdt(uint32_t rsdt)
 
   while (sdt < end) {
     uint64_t address = (uint64_t) *sdt++;
-    acpi_parse_dt((acpi_header_t *) address);
+    page_start = (address >> PG_BITS) << PG_BITS;
+    uint8_t *va2 = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
+    acpi_header_t *dt_p = (acpi_header_t *) (va2 + address - page_start); 
+    acpi_parse_dt(dt_p);
+    vm_unmap_pages(va2, 2);
   }
 
   vm_unmap_pages(va, 2);
@@ -117,7 +122,11 @@ static void acpi_parse_xsdt(uint64_t xsdt)
 
   while (sdt < end) {
     uint64_t address = *sdt++;
-    acpi_parse_dt((acpi_header_t *) address);
+    page_start = (address >> PG_BITS) << PG_BITS;
+    uint8_t *va2 = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
+    acpi_header_t *dt_p = (acpi_header_t *) (va2 + address - page_start);
+    acpi_parse_dt(dt_p);
+    vm_unmap_pages(va2, 2);
   }
 
   vm_unmap_pages(va, 2);
@@ -125,33 +134,23 @@ static void acpi_parse_xsdt(uint64_t xsdt)
 
 static bool acpi_parse_rsdp(uint8_t *p)
 {
-  // Parse Root System Description Pointer
-  printf("RSDP found\n");
-
   // Verify checksum
   uint8_t sum = 0;
   for (uint8_t i = 0; i < 20; ++i) 
     sum += p[i];
 
-  if (sum) {
-    printf("Checksum failed\n");
-    return false;
-  }
-  // Print OEM
-  char oem[7];
-  memcpy(oem, p + 9, 6);
-  oem[6] = '\0';
-  printf("OEM = %s\n", oem);
+  if (sum) 
+    panic("Checksum failed");
 
   // Check version
   uint8_t revision = p[15];
   if (revision == 0) {
-    printf("Version 1\n");
+    //printf("Version 1\n");
 
     uint32_t rsdt_addr = *(uint32_t *) (p + 16); 
     acpi_parse_rsdt(rsdt_addr);
   } else if (revision == 2) {
-    printf("Version 2\n");
+    //printf("Version 2\n");
 
     uint32_t rsdt_addr = *(uint32_t *) (p + 16);
     uint64_t xsdt_addr = *(uint64_t *) (p + 24);
@@ -186,7 +185,8 @@ void acpi_init(void)
     p += 16;
   }
 
-  printf("Can't find RSDP\n");
+  if (p >= end)
+    panic("Can't find RSDP");
 }
 
 uint8_t acpi_irq_map(uint8_t irq)

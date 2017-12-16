@@ -19,7 +19,7 @@
 #include "utils/bits.h"
 #include "helper.h"
 
-#define VM_TABLE_ENTRIES (PG_SIZE / 64)
+#define VM_TABLE_ENTRIES (PG_SIZE / sizeof(uint64_t))
 
 #define VM_TABLE_MASK ((1 << (PG_BITS - 3)) - 1)
 
@@ -31,7 +31,7 @@ void *vm_map_page(uint64_t frame, uint64_t flags)
   void *va;
 
   for (i = 0; i < VM_TABLE_ENTRIES; i++) {
-    if (!get_bit64(kernel_pgt[i], PGT_P)) {
+    if (!(kernel_pgt[i] & PGT_P)) {
       kernel_pgt[i] = frame | flags;
       va = (void *) (KERNEL_MAPPING_BASE + (i << PG_BITS));
 
@@ -52,11 +52,11 @@ void *vm_map_pages(uint64_t frame, size_t num, uint64_t flags)
   if (num < 1) return NULL;
 
   for (i = 0; i < VM_TABLE_ENTRIES - num + 1; i++) {
-    if (!get_bit64(kernel_pgt[i], PGT_P)) {
+    if (!(kernel_pgt[i] & PGT_P)) {
       count++;
 
       for (j = i + 1; j < i + num; j++) {
-        if (!get_bit64(kernel_pgt[j], PGT_P))
+        if (!(kernel_pgt[j] & PGT_P))
           count++;
         else
           break;

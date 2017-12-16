@@ -19,6 +19,7 @@
 #include "cpu.h"
 #include "io.h"
 #include "utils/screen.h"
+#include "vm.h"
 
 idt_entry idt64[IDT_ENTRY_NR] ALIGNED(PG_SIZE);
 idt_desc idtr;
