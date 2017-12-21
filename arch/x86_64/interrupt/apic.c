@@ -18,7 +18,8 @@
 #include "apic.h"
 #include "io.h"
 
-uint8_t *lapic_addr;
+/* Default address: 0xFEE00000 */
+uint8_t *lapic_addr = (uint8_t *) 0xFEE00000;
 
 static inline void lapic_write32(uint16_t offset, uint32_t data)
 {

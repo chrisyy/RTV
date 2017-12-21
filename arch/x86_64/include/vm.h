@@ -19,14 +19,14 @@
 
 #define PGT_MASK 0xFFFFFFFFFFFFF000
 
-/* first 2MB is identity mapping for kernel, this 2MB is for dynamic mapping */
-#define KERNEL_MAPPING_BASE 0x200000
+/* first 4MB is identity mapping for kernel, this 2MB is for dynamic mapping */
+#define KERNEL_MAPPING_BASE 0x400000
 
 extern void vm_init(void);
 extern void *vm_map_page(uint64_t frame, uint64_t flags);
-extern void *vm_map_pages(uint64_t frame, size_t num, uint64_t flags);
+extern void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags);
 extern void vm_unmap_page(void *va);
-extern void vm_unmap_pages(void *va, size_t num);
+extern void vm_unmap_pages(void *va, uint64_t num);
 
 static inline void invalidate_page(void *va)
 {

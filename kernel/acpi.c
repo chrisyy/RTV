@@ -21,20 +21,20 @@
 #include "helper.h"
 #include "vm.h"
 
-#define MAX_CPU_COUNT 100
-uint8_t g_acpiCpuCount;
-uint8_t g_acpiCpuIds[MAX_CPU_COUNT];
+uint8_t g_cpus = 0;
 
 static acpi_madt_t *g_madt;
 
 static void acpi_parse_apic(acpi_madt_t *madt)
 {
+  uint8_t *p, *end;
+  extern uint8_t *lapic_addr;
+  
   g_madt = madt;
+  lapic_addr = (uint8_t *) (uint64_t) madt->lapic_addr;
 
-  //g_localApicAddr = (uint8_t *)madt->localApicAddr;
-
-  uint8_t *p = (uint8_t *) (madt + 1);
-  uint8_t *end = (uint8_t *) madt + madt->header.length;
+  p = (uint8_t *) (madt + 1);
+  end = (uint8_t *) madt + madt->header.length;
 
   while (p < end) {
     apic_header_t *header = (apic_header_t *) p;
@@ -42,28 +42,22 @@ static void acpi_parse_apic(acpi_madt_t *madt)
     uint8_t length = header->length;
 
     if (type == APIC_TYPE_LAPIC) {
-      apic_lapic_t *s = (apic_lapic_t *) p;
-
+      //apic_lapic_t *s = (apic_lapic_t *) p;
       //printf("Found CPU: %d %d %x\n", s->processor_id, s->apic_id, s->flags);
-      if (g_acpiCpuCount < MAX_CPU_COUNT) {
-        g_acpiCpuIds[g_acpiCpuCount] = s->apic_id;
-        ++g_acpiCpuCount;
-      }
+      ++g_cpus;
     }
     else if (type == APIC_TYPE_IOAPIC) {
-      apic_ioapic_t *s = (apic_ioapic_t *) p;
+      //apic_ioapic_t *s = (apic_ioapic_t *) p;
 
       //printf("Found I/O APIC: %d 0x%08x %d\n", s->id, s->address, s->gsi_base);
       //g_ioApicAddr = (uint8_t *)s->ioApicAddress;
     }
     else if (type == APIC_TYPE_INTERRUPT_OVERRIDE) {
-      apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
-
+      //apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
       //printf("Found Interrupt Override: %d %d %d 0x%04x\n", s->bus, s->source, s->interrupt, s->flags);
     }
     else {
-      //TODO
-      //printf("Un-supported APIC structure %d\n", type);
+      //printf("Unsupported APIC structure %d\n", type);
     }
 
     p += length;
@@ -72,15 +66,13 @@ static void acpi_parse_apic(acpi_madt_t *madt)
 
 static void acpi_parse_dt(acpi_header_t *header)
 { 
-  uint32_t signature = header->signature;
-
   //char sigstr[5];
   //memcpy(sigstr, &signature, 4);
   //sigstr[4] = 0;
   //printf("%s 0x%x\n", sigstr, signature);
 
   /* "APIC" */
-  if (signature == 0x43495041) 
+  if (header->signature == 0x43495041) 
     acpi_parse_apic((acpi_madt_t *) header);
 }
 
@@ -136,14 +128,16 @@ static bool acpi_parse_rsdp(uint8_t *p)
 {
   // Verify checksum
   uint8_t sum = 0;
-  for (uint8_t i = 0; i < 20; ++i) 
-    sum += p[i];
+  uint8_t i;
+  uint8_t revision;
 
+  for (i = 0; i < 20; ++i) 
+    sum += p[i];
   if (sum) 
-    panic("Checksum failed");
+    panic(__func__, "Checksum failed");
 
   // Check version
-  uint8_t revision = p[15];
+  revision = p[15];
   if (revision == 0) {
     //printf("Version 1\n");
 
@@ -160,7 +154,7 @@ static bool acpi_parse_rsdp(uint8_t *p)
     else
       acpi_parse_rsdt(rsdt_addr);
   } else
-    printf("Unsupported ACPI version %d\n", revision);
+    panic(__func__, "Unsupported ACPI version");
 
   return true;
 }
@@ -186,7 +180,7 @@ void acpi_init(void)
   }
 
   if (p >= end)
-    panic("Can't find RSDP");
+    panic(__func__, "Can't find RSDP");
 }
 
 uint8_t acpi_irq_map(uint8_t irq)

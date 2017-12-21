@@ -14,7 +14,6 @@ data types:
 for string, use char;
 otherwise, be explicit with bit length (stdint types):
 int32_t, uint8_t, ...
-always use size_t for sizes of data in function argument
 
 
 (use upper case for constant hex numbers)
@@ -54,6 +53,12 @@ case y:
 
 for (i = 1; i < limit; i++) {
   ...
+}
+
+for (i = .................;
+     i < .................;
+     i ...................) {
+  ...     
 }
 
 do {
@@ -117,4 +122,5 @@ int foo()
   set(a);
 }
 
+return type: pointer
 int *memcpy();

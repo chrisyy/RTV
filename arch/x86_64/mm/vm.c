@@ -43,11 +43,11 @@ void *vm_map_page(uint64_t frame, uint64_t flags)
 }
 
 /* map contiguous physical frames to contiguous virtual memory */
-void *vm_map_pages(uint64_t frame, size_t num, uint64_t flags)
+void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags)
 {
   uint64_t i, j;
   void *va;
-  size_t count = 0;
+  uint64_t count = 0;
 
   if (num < 1) return NULL;
 
@@ -89,7 +89,7 @@ void vm_unmap_page(void *va)
   invalidate_page(va);
 }
 
-void vm_unmap_pages(void *va, size_t num)
+void vm_unmap_pages(void *va, uint64_t num)
 {
   uint8_t *pg = (uint8_t *) va;
   uint64_t i = ((uint64_t) va) >> PG_BITS;

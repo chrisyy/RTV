@@ -21,6 +21,8 @@
 #include "cpu.h"
 #include "acpi.h"
 #include "vm.h"
+#include "apic.h"
+#include "mm/physical.h"
 
 /* percpu */
 tss_t cpu_tss;
@@ -49,21 +51,23 @@ void kernel_main(uint64_t magic, uint64_t mbi)
         break;
 
       case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
-        printf("mem_lower = %uKB, mem_upper = %uKB\n",
+        /*printf("mem_lower = %uKB, mem_upper = %uKB\n",
                 ((struct multiboot_tag_basic_meminfo *) tag)->mem_lower,
-                ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper);
+                ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper);*/
         break;
 
       case MULTIBOOT_TAG_TYPE_MMAP: {
         multiboot_memory_map_t *mmap;
      
         for (mmap = ((struct multiboot_tag_mmap *) tag)->entries;
-             (multiboot_uint8_t *) mmap
-              < (multiboot_uint8_t *) tag + tag->size;
-             mmap = (multiboot_memory_map_t *) ((unsigned long) mmap
-                    + ((struct multiboot_tag_mmap *) tag)->entry_size))
+             (multiboot_uint8_t *) mmap < (multiboot_uint8_t *) tag + tag->size;
+             mmap = (multiboot_memory_map_t *) ((unsigned long) mmap 
+             + ((struct multiboot_tag_mmap *) tag)->entry_size)) {
+          //if (mmap->type == MULTIBOOT_MEMORY_AVAILABLE)
+            //physical_free_range(mmap->addr, mmap->len);
           printf("base_addr = 0x%llx, length = 0x%llx, type = 0x%x\n",
                  mmap->addr, mmap->len, mmap->type);
+        }
         break;
       }
       case MULTIBOOT_TAG_TYPE_FRAMEBUFFER: {
@@ -92,7 +96,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   acpi_init();
 
-  //lapic_init();
+  lapic_init();
 
   cpu_tss.rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
   selector = alloc_tss_desc(&cpu_tss);

@@ -86,7 +86,7 @@ _start:
   andl $0x7FFFFFFF, %eax
   movl %eax, %cr0
 
-  /* set up first 2MB identity mapping */
+  /* set up first 4MB identity mapping */
   movl $pdpt, %eax
   orl $0x3, %eax  /* present+write bits */
   movl %eax, pml4t
@@ -97,6 +97,10 @@ _start:
 
   movl $0x83, %eax  /* 2MB page */
   movl %eax, pdt
+
+  movl $0x200000, %eax
+  orl $0x83, %eax   /* 2MB page */
+  movl %eax, pdt + 8
 
   /* set up 4KB identity mapping for LAPIC (0xFEE00000) */
   // TODO: remove hard-coded addr, also set up mapping in C
