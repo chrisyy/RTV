@@ -14,6 +14,7 @@ data types:
 for string, use char;
 otherwise, be explicit with bit length (stdint types):
 int32_t, uint8_t, ...
+avoid using size_t
 
 
 (use upper case for constant hex numbers)

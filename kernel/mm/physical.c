@@ -21,17 +21,47 @@
 static uint64_t mm_table[MM_TABLE_MAX] ALIGNED(PG_SIZE);
 static uint64_t mm_limit;
 
-void physical_free_range(uint64_t begin, size_t length)
+void physical_free_range(uint64_t begin, uint64_t length)
 {
-  bitmap64_set_range(mm_table, begin, length);
+  uint64_t remain = begin % PG_SIZE;
+  uint64_t end_remain = (begin + length) % PG_SIZE;
+  if (remain == 0)
+    bitmap64_set_range(mm_table, begin >> PG_BITS, 
+                       (length - end_remain) >> PG_BITS);
+  else
+    bitmap64_set_range(mm_table, (begin >> PG_BITS) + 1, 
+                       (length - (PG_SIZE - remain) - end_remain) >> PG_BITS);
 }
 
-void physical_take_range(uint64_t begin, size_t length)
+void physical_take_range(uint64_t begin, uint64_t length)
 {
-  bitmap64_clear_range(mm_table, begin, length);
+  uint64_t remain = begin % PG_SIZE;
+  uint64_t end_remain = (begin + length) % PG_SIZE;
+  if (end_remain == 0)
+    bitmap64_clear_range(mm_table, begin >> PG_BITS, (length + remain) >> PG_BITS);
+  else
+    bitmap64_clear_range(mm_table, begin >> PG_BITS, 
+                         (length + remain + PG_SIZE - end_remain) >> PG_BITS);
 }
 
 void physical_set_limit(uint64_t limit)
 {
-  mm_limit = limit;
+  mm_limit = limit >> PG_BITS;
+
+#if 1
+  /* mm_table checking */
+  uint64_t i;
+  int flag = 0;
+  for (i = 0; i < MM_TABLE_MAX; i++) {
+    if (mm_table[i] != UINT64_MAX && flag != 0) {
+      printf("mm_table[0x%llX]: %llX\n", i, mm_table[i]);
+      if (!(mm_table[i] & ((uint64_t) 0x1 << 63)))
+        flag = 0;
+    } else if (mm_table[i] != 0 && flag == 0) {
+      printf("mm_table[0x%llX]: %llX\n", i, mm_table[i]);
+      if (mm_table[i] & ((uint64_t) 0x1 << 63))
+        flag = 1;
+    }
+  }
+#endif
 }

@@ -34,6 +34,9 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 {
   struct multiboot_tag *tag;
   uint16_t selector;
+  uint64_t mem_end, mem_limit = 0;
+  extern uint64_t _boot_start, _boot_pages; 
+  extern uint64_t _kernel_ro_pages, _kernel_rw_pages;
 
   /* multiboot2 */
   if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
@@ -50,12 +53,6 @@ void kernel_main(uint64_t magic, uint64_t mbi)
         //printf("CMD: %s\n", ((struct multiboot_tag_string *) tag)->string);
         break;
 
-      case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
-        /*printf("mem_lower = %uKB, mem_upper = %uKB\n",
-                ((struct multiboot_tag_basic_meminfo *) tag)->mem_lower,
-                ((struct multiboot_tag_basic_meminfo *) tag)->mem_upper);*/
-        break;
-
       case MULTIBOOT_TAG_TYPE_MMAP: {
         multiboot_memory_map_t *mmap;
      
@@ -63,8 +60,12 @@ void kernel_main(uint64_t magic, uint64_t mbi)
              (multiboot_uint8_t *) mmap < (multiboot_uint8_t *) tag + tag->size;
              mmap = (multiboot_memory_map_t *) ((unsigned long) mmap 
              + ((struct multiboot_tag_mmap *) tag)->entry_size)) {
-          //if (mmap->type == MULTIBOOT_MEMORY_AVAILABLE)
-            //physical_free_range(mmap->addr, mmap->len);
+          if (mmap->type == MULTIBOOT_MEMORY_AVAILABLE) {
+            physical_free_range(mmap->addr, mmap->len);
+            mem_end = mmap->addr + mmap->len;
+            if (mem_end > mem_limit)
+              mem_limit = mem_end;
+          }
           printf("base_addr = 0x%llx, length = 0x%llx, type = 0x%x\n",
                  mmap->addr, mmap->len, mmap->type);
         }
@@ -89,6 +90,11 @@ void kernel_main(uint64_t magic, uint64_t mbi)
       }
     }
   }
+
+  physical_take_range((uint64_t) &_boot_start, ((uint64_t) &_boot_pages
+                      + (uint64_t) &_kernel_ro_pages
+                      + (uint64_t) &_kernel_rw_pages) * PG_SIZE);
+  physical_set_limit(mem_limit);
 
   interrupt_init();
 

@@ -5,7 +5,8 @@ ENTRY(_start)
 SECTIONS
 {
   /* starts from 1MB */
-  . = 1M;
+  _boot_start = 1M;
+  . = _boot_start;
 
   .physicaltext : ALIGN(4K)
   {
@@ -26,6 +27,7 @@ SECTIONS
   } 
 
   _kernel_start_pa = ALIGN(4K);
+  _boot_pages = (_kernel_start_pa - _boot_start) / 0x1000;
 
   _kernel_start_va = _kernel_start_pa;
   . = _kernel_start_va;
@@ -57,6 +59,9 @@ SECTIONS
     *(EXCLUDE_FILE(*boot/boot.o) .bss COMMON)
   }
   _bss_end = ALIGN(4K);
+
+  _kernel_ro_pages = (_rodata_end - _kernel_start_va) / 0x1000;
+  _kernel_rw_pages = (_bss_end - _data) / 0x1000;
 
   .eh_frame : AT(LOADADDR(.bss) + _bss_end - _bss) ALIGN(4K)
   {

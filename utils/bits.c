@@ -17,6 +17,10 @@
 
 #include "utils/bits.h"
 
+/* 
+ * within a uint64_t, bit(n) is the least significant bit, 
+ * bit(n + 63) is the most significant bit 
+ */
 void bitmap64_set_range(uint64_t *map, uint64_t begin, uint64_t length)
 {
   uint64_t *ptr = map + (begin >> 6);
