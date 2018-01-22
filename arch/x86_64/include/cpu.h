@@ -5,6 +5,9 @@
 #define GDT_ENTRY_NR 512
 #define IDT_ENTRY_NR 256
 
+/* skip null + code + data */
+#define GDT_START 3
+
 #ifndef __ASSEMBLER__
 #include "types.h"
 

@@ -27,7 +27,6 @@
 /* percpu */
 tss_t cpu_tss;
 
-/* percpu */
 extern uint8_t kernel_stack[PG_SIZE];
 
 void kernel_main(uint64_t magic, uint64_t mbi)

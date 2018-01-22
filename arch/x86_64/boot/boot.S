@@ -30,7 +30,6 @@
   .comm pdt1, 0x1000
   .comm PT, 0x1000
 
-  /* TODO: use a tmp stack here, move the kernel_stack to C file */
   .global kernel_stack
 kernel_stack:
   .skip 0x1000
@@ -88,6 +87,7 @@ _start:
   movl %eax, %cr0
 
   /* set up first 4MB identity mapping */
+  //TODO: set up n MB mapping instead, based on the size of kernel
   movl $pdpt, %eax
   orl $0x3, %eax  /* present+write bits */
   movl %eax, pml4t

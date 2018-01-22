@@ -4,6 +4,13 @@ ENTRY(_start)
 
 SECTIONS
 {
+  /* per-CPU data, dynamically allocated */
+  . = 0x0;
+  _percpustart = .;
+  .percpu (NOLOAD) : { *(.percpu) } : NONE
+  _percpuend = ALIGN(4K);
+  _percpu_pages_plus_one = (_percpuend - _percpustart) / 0x1000 + 1;
+
   /* starts from 1MB */
   _boot_start = 1M;
   . = _boot_start;
