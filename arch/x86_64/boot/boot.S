@@ -88,6 +88,7 @@ _start:
 
   /* set up first 4MB identity mapping */
   //TODO: set up n MB mapping instead, based on the size of kernel
+  //need to change KERNEL_MAPPING_BASE as well
   movl $pdpt, %eax
   orl $0x3, %eax  /* present+write bits */
   movl %eax, pml4t

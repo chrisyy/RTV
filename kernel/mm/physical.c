@@ -49,7 +49,7 @@ void physical_set_limit(uint64_t limit)
   /* last available page + 1 */
   mm_limit = limit >> PG_BITS;
   entry_end = mm_limit >> 6;
-  if (mm_limit & 63 > 0)
+  if ((mm_limit & 63) > 0)
     entry_end++;
 
 #if 0

@@ -23,6 +23,7 @@
 #include "vm.h"
 #include "apic.h"
 #include "mm/physical.h"
+#include "percpu.h"
 
 /* percpu */
 tss_t cpu_tss;
@@ -47,46 +48,34 @@ void kernel_main(uint64_t magic, uint64_t mbi)
        tag->type != MULTIBOOT_TAG_TYPE_END;
        tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
                                             + ((tag->size + 7) & ~7))) {
-    switch (tag->type) {
-      case MULTIBOOT_TAG_TYPE_CMDLINE:
-        //printf("CMD: %s\n", ((struct multiboot_tag_string *) tag)->string);
-        break;
-
-      case MULTIBOOT_TAG_TYPE_MMAP: {
-        multiboot_memory_map_t *mmap;
-     
-        for (mmap = ((struct multiboot_tag_mmap *) tag)->entries;
-             (multiboot_uint8_t *) mmap < (multiboot_uint8_t *) tag + tag->size;
-             mmap = (multiboot_memory_map_t *) ((unsigned long) mmap 
-             + ((struct multiboot_tag_mmap *) tag)->entry_size)) {
-          if (mmap->type == MULTIBOOT_MEMORY_AVAILABLE) {
-            physical_free_range(mmap->addr, mmap->len);
-            mem_end = mmap->addr + mmap->len;
-            if (mem_end > mem_limit)
-              mem_limit = mem_end;
-          }
-          printf("base_addr = 0x%llx, length = 0x%llx, type = 0x%x\n",
-                 mmap->addr, mmap->len, mmap->type);
+    switch(tag->type) {
+    case MULTIBOOT_TAG_TYPE_CMDLINE:
+      //printf("CMD: %s\n", ((struct multiboot_tag_string *) tag)->string);
+      break;
+    case MULTIBOOT_TAG_TYPE_MMAP: {
+      multiboot_memory_map_t *mmap;
+    
+      for (mmap = ((struct multiboot_tag_mmap *) tag)->entries;
+           (multiboot_uint8_t *) mmap < (multiboot_uint8_t *) tag + tag->size;
+           mmap = (multiboot_memory_map_t *) ((unsigned long) mmap 
+           + ((struct multiboot_tag_mmap *) tag)->entry_size)) {
+        if (mmap->type == MULTIBOOT_MEMORY_AVAILABLE) {
+          physical_free_range(mmap->addr, mmap->len);
+          mem_end = mmap->addr + mmap->len;
+          if (mem_end > mem_limit)
+            mem_limit = mem_end;
         }
-        break;
+        printf("base_addr = 0x%llx, length = 0x%llx, type = 0x%x\n",
+               mmap->addr, mmap->len, mmap->type);
       }
-      case MULTIBOOT_TAG_TYPE_FRAMEBUFFER: {
-        struct multiboot_tag_framebuffer *tagfb
-          = (struct multiboot_tag_framebuffer *) tag;
-        frameBuf = (uint8_t *) tagfb->common.framebuffer_addr;
-     
-        switch (tagfb->common.framebuffer_type) {
-          case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED: 
-            break;
-     
-          case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
-            break;
-     
-          case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
-            break;
-        }
-        break;
-      }
+      break;
+    }
+    case MULTIBOOT_TAG_TYPE_FRAMEBUFFER: {
+      struct multiboot_tag_framebuffer *tagfb
+        = (struct multiboot_tag_framebuffer *) tag;
+      frameBuf = (uint8_t *) tagfb->common.framebuffer_addr;
+      break;
+    }
     }
   }
 
@@ -98,6 +87,8 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   interrupt_init();
 
   vm_init();
+
+  percpu_init();
 
   acpi_init();
 

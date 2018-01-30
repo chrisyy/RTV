@@ -28,7 +28,7 @@ type_ljiemsenoicpeo X
 type_a *X = (type_a *) Y;
 *Y = 38054;
 
-when there is only one line in a if/else/for/while, no brackets, in two separate lines:
+when there is only one line inside a if/else/for/while, no brackets, but in two separate lines:
 if (x)
   foo();
 
@@ -39,7 +39,8 @@ if (x) {
 }
 
 if (x && y) {
-  ...
+  if (a)
+    print;
 }
 
 switch (cond) {
@@ -65,6 +66,7 @@ for (i = .................;
 do {
   ...
 } while (x);
+
 
 Function:
 y = foo(x);
@@ -96,10 +98,18 @@ struct type_a {
   ...
 };
 
+type_a_t data = {
+  .mem1 = x,
+  .mem2 = y
+};
+
+
 __asm__ volatile("abc" : y : "a" (x) : z);
 
 __asm__ volatile("abc" : y 
                  : "a" (x) : z);
+(instead of use 'asm')
+
 
 Function naming: lower case 
 for external-facing interface of a module, add the module name:

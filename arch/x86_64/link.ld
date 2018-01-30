@@ -46,7 +46,16 @@ SECTIONS
   }
   _text_end = ALIGN(4K);
 
-  .rodata : AT(LOADADDR(.text) + _text_end - _text) ALIGN(4K)
+  /* Insert a read-only null-terminated array of pointers to constructors */
+  .ctors : AT(LOADADDR(.text) + _text_end - _text) ALIGN(4K)
+  { 
+    _percpu_ctors = .;
+    *(.percpu.ctor);
+    QUAD(0) 
+  }
+  _percpu_ctors_end = ALIGN(4K);
+
+  .rodata : AT(LOADADDR(.ctors) + _percpu_ctors_end - _percpu_ctors) ALIGN(4K)
   {
     _rodata = .;
     *(EXCLUDE_FILE(*boot/boot.o) .rodata)

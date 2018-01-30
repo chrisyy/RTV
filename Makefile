@@ -1,3 +1,4 @@
+include config.mk
 
 TARGET := x86_64-elf
 ARCH := x86_64
@@ -15,7 +16,7 @@ DEPS := $(OBJS:.o=.d)
 INC_FLAGS := -Iinclude -Iarch/$(ARCH)/include
 ISO_DIR := iso
 
-CFLAGS := -ffreestanding -mcmodel=large -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -g -Wall -MMD -lgcc $(INC_FLAGS)
+CFLAGS := -ffreestanding -mcmodel=large -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -g -Wall -MMD -lgcc $(INC_FLAGS) $(CFG)
 LDFLAGS := -nostdlib -z max-page-size=4096
 
 .PHONY: all iso clean
@@ -30,6 +31,11 @@ $(PROG): $(OBJS)
 
 %.o: %.S
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJS): config.mk
+
+config.mk:
+	cp -f default_config.mk config.mk
 
 iso: 
 	mkdir -p $(ISO_DIR)/boot/grub
@@ -46,6 +52,4 @@ debug:
 clean:
 	rm -rf $(OBJS) $(PROG) $(DEPS) $(PROG).iso $(ISO_DIR)
 
-
 -include $(DEPS)
-

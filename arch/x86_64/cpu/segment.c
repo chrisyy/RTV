@@ -24,7 +24,7 @@ uint16_t alloc_tss_desc(tss_t *tss_p)
 {
   uint16_t i;
   uint32_t limit = sizeof(tss_t) - 1;
-  /* skip the used (null) entries */
+
   for (i = GDT_START; i < GDT_ENTRY_NR; i++) {
     if (!gdt64[i].p) {
       tss_desc *entry = (tss_desc *) &gdt64[i];
