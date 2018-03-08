@@ -26,7 +26,7 @@
 #include "percpu.h"
 
 /* percpu */
-tss_t cpu_tss;
+DEF_PER_CPU(tss_t, cpu_tss);
 
 extern uint8_t kernel_stack[PG_SIZE];
 
@@ -35,6 +35,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   struct multiboot_tag *tag;
   uint16_t selector;
   uint64_t mem_end, mem_limit = 0;
+  tss_t *tss_ptr;
   extern uint64_t _boot_start, _boot_pages; 
   extern uint64_t _kernel_ro_pages, _kernel_rw_pages;
 
@@ -65,8 +66,8 @@ void kernel_main(uint64_t magic, uint64_t mbi)
           if (mem_end > mem_limit)
             mem_limit = mem_end;
         }
-        printf("base_addr = 0x%llx, length = 0x%llx, type = 0x%x\n",
-               mmap->addr, mmap->len, mmap->type);
+        //printf("base_addr = 0x%llx, length = 0x%llx, type = 0x%x\n",
+        //       mmap->addr, mmap->len, mmap->type);
       }
       break;
     }
@@ -94,8 +95,13 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   lapic_init();
 
-  cpu_tss.rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
-  selector = alloc_tss_desc(&cpu_tss);
+  printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
+
+  tss_ptr = percpu_pointer(get_pcpu_id(), cpu_tss);
+  //cpu_tss.rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
+  //selector = alloc_tss_desc(&cpu_tss);
+  tss_ptr->rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
+  selector = alloc_tss_desc(tss_ptr);
   load_tr(selector);
 
   interrupt_enable();

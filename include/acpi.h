@@ -54,6 +54,8 @@ typedef struct _apic_interruptoverride {
   uint16_t flags;
 } PACKED apic_interruptoverride_t;
 
+extern uint16_t g_cpus;
+
 extern void acpi_init(void);
 extern uint8_t acpi_irq_map(uint8_t irq);
 

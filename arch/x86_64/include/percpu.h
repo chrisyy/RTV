@@ -1,10 +1,12 @@
 #ifndef _PERCPU_H_
 #define _PERCPU_H_
 
+#include "helper.h"
+
 #define PER_CPU_SEG_STR "fs"
 
 /* Define a per-CPU variable */
-#define DEF_PER_CPU(type,var) __attribute__ ((section(".percpu"))) type var
+#define DEF_PER_CPU(type, var) __attribute__ ((section(".percpu"))) type var
 
 /* Define an initialization function for a per-CPU variable */
 #define INIT_PER_CPU(var)                                                       \
@@ -70,7 +72,16 @@
   }) 
 
 extern uint8_t *percpu_virt[MAX_CPUS];
+/* Get a pointer to a per-CPU variable, with explicit CPU parameter */
+#define percpu_pointer(cpu, var) ((void *) (&percpu_virt[(cpu)][(uint64_t) &(var)]))
+
+extern DEF_PER_CPU(uint16_t, pcpu_id);
 
 extern void percpu_init(void);
+
+static inline uint16_t get_pcpu_id(void)
+{
+  return percpu_read(pcpu_id);
+}
 
 #endif

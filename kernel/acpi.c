@@ -21,16 +21,16 @@
 #include "helper.h"
 #include "vm.h"
 
-uint8_t g_cpus = 0;
+uint16_t g_cpus = 0;
 
-static acpi_madt_t *g_madt;
+static acpi_madt_t *acpi_madt;
 
 static void acpi_parse_apic(acpi_madt_t *madt)
 {
   uint8_t *p, *end;
   extern uint8_t *lapic_addr;
   
-  g_madt = madt;
+  acpi_madt = madt;
   lapic_addr = (uint8_t *) (uint64_t) madt->lapic_addr;
 
   p = (uint8_t *) (madt + 1);
@@ -185,7 +185,7 @@ void acpi_init(void)
 
 uint8_t acpi_irq_map(uint8_t irq)
 {
-  acpi_madt_t *madt = g_madt;
+  acpi_madt_t *madt = acpi_madt;
 
   uint8_t *p = (uint8_t *) (madt + 1);
   uint8_t *end = (uint8_t *) madt + madt->header.length;

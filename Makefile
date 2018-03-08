@@ -44,10 +44,10 @@ iso:
 	grub-mkrescue -o $(PROG).iso $(ISO_DIR)
 
 run:
-	qemu-system-x86_64 -cdrom $(PROG).iso -m 4G -smp 2 &
+	qemu-system-x86_64 -cdrom $(PROG).iso -m 4G -smp 2 -enable-kvm -cpu host &
 
 debug:
-	qemu-system-x86_64 -s -S -d int,guest_errors,mmu -D qemu.log -cdrom $(PROG).iso -m 4G -smp 2 &
+	qemu-system-x86_64 -s -S -d int,guest_errors,mmu -D qemu.log -cdrom $(PROG).iso -m 4G -smp 2 -enable-kvm -cpu host &
 
 clean:
 	rm -rf $(OBJS) $(PROG) $(DEPS) $(PROG).iso $(ISO_DIR)

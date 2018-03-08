@@ -82,5 +82,39 @@ static inline void load_tr(uint16_t selector)
   __asm__ volatile("ltr %0" : : "r" (selector));
 }
 
+static inline void cpuid(uint32_t in_eax, uint32_t in_ecx, uint32_t *out_eax, 
+                         uint32_t *out_ebx, uint32_t *out_ecx, uint32_t *out_edx)
+{
+  uint32_t eax, ebx, ecx, edx;
+  __asm__ volatile("cpuid" : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
+                   : "a" (in_eax), "c" (in_ecx));
+  if (out_eax)
+    *out_eax = eax;
+  if (out_ebx)
+    *out_ebx = ebx;
+  if (out_ecx)
+    *out_ecx = ecx;
+  if (out_edx)
+    *out_edx = edx;
+}
+
+static inline uint64_t rdmsr(uint32_t ecx)
+{
+  uint32_t edx, eax;
+
+  __asm__ volatile("rdmsr" : "=d" (edx), "=a" (eax) : "c" (ecx));
+  return (((uint64_t) edx) << 32) | ((uint64_t) eax);
+}
+
+static inline void wrmsr(uint32_t ecx, uint64_t val)
+{
+  uint32_t edx, eax;
+
+  edx = (uint32_t) (val >> 32);
+  eax = (uint32_t) val;
+
+  __asm__ volatile ("wrmsr" : : "d" (edx), "a" (eax), "c" (ecx));
+}
+
 #endif /* __ASSEMBLER__ */
 #endif
