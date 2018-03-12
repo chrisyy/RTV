@@ -93,13 +93,13 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   acpi_init();
 
-  lapic_init();
+  apic_init();
 
   printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
 
-  tss_ptr = percpu_pointer(get_pcpu_id(), cpu_tss);
   //cpu_tss.rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
   //selector = alloc_tss_desc(&cpu_tss);
+  tss_ptr = percpu_pointer(get_pcpu_id(), cpu_tss);
   tss_ptr->rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
   selector = alloc_tss_desc(tss_ptr);
   load_tr(selector);

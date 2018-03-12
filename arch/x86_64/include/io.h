@@ -30,4 +30,9 @@ static inline void mmio_write32(void *addr, uint32_t data)
   *((volatile uint32_t *) addr) = data;
 }
 
+static inline uint32_t mmio_read32(void *addr)
+{
+  return *((volatile uint32_t *) addr);
+}
+
 #endif

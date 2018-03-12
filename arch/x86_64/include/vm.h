@@ -27,6 +27,7 @@ extern void *vm_map_page(uint64_t frame, uint64_t flags);
 extern void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags);
 extern void vm_unmap_page(void *va);
 extern void vm_unmap_pages(void *va, uint64_t num);
+extern void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr);
 
 static inline void invalidate_page(void *va)
 {

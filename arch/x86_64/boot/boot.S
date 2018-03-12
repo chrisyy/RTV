@@ -27,8 +27,6 @@
   .comm pml4t, 0x1000
   .comm pdpt, 0x1000
   .comm pdt, 0x1000
-  .comm pdt1, 0x1000
-  .comm PT, 0x1000
 
   .global kernel_stack
 kernel_stack:
@@ -103,19 +101,6 @@ _start:
   movl $0x200000, %eax
   orl $0x83, %eax   /* 2MB page */
   movl %eax, pdt + 8
-
-  /* set up 4KB identity mapping for LAPIC (0xFEE00000) */
-  // TODO: remove hard-coded addr, also set up mapping in C
-  movl $pdt1, %eax
-  orl $0x3, %eax
-  movl %eax, pdpt + 3 * 8
-
-  movl $PT, %eax
-  orl $0x3, %eax
-  movl %eax, pdt1 + 503 * 8
-
-  movl $0x1B, %eax  /* 4KB page, uncacheable, write-through */
-  movl %eax, PT
 
   movl $pml4t, %eax
   movl %eax, %cr3 

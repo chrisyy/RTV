@@ -12,6 +12,8 @@
 #define PIT_FREQ 1193182
 #define HZ 100
 
+#define PIT_IRQ   0
+
 void interrupt_init(void);
 
 static inline void interrupt_enable(void)

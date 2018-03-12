@@ -16,6 +16,7 @@
  */
 
 #include "vm.h"
+#include "mm/physical.h"
 #include "utils/bits.h"
 #include "helper.h"
 
@@ -103,6 +104,56 @@ void vm_unmap_pages(void *va, uint64_t num)
     i++;
     pg += PG_SIZE;
   }
+}
+
+void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr)
+{
+  uint64_t new;
+  uint64_t entry;
+  uint64_t *pdpt, *pdt, *pt;
+  extern uint64_t pml4t[];
+  
+  entry = (vaddr & 0xFF8000000000) >> 39;
+  if ((pml4t[entry] & PGT_P) == 0) { 
+    new = alloc_phys_frame();
+    if (new == 0)
+      panic(__func__, "page allocation for PDPT failed");
+    pml4t[entry] = new | PGT_P | PGT_RW;
+    pdpt = (uint64_t *) vm_map_page(new, PGT_P | PGT_RW);
+  } else
+    pdpt = (uint64_t *) vm_map_page(pml4t[entry] & PGT_MASK, PGT_P | PGT_RW);
+
+  if (pdpt == NULL)
+      panic(__func__, "failed to map page");
+
+  entry = (vaddr & 0x7FC0000000) >> 30;
+  if ((pdpt[entry] & PGT_P) == 0) {
+    new = alloc_phys_frame();
+    if (new == 0)
+      panic(__func__, "page allocation for PDT failed");
+    pdpt[entry] = new | PGT_P | PGT_RW;
+    pdt = (uint64_t *) vm_map_page(new, PGT_P | PGT_RW);
+  } else
+    pdt = (uint64_t *) vm_map_page(pdpt[entry] & PGT_MASK, PGT_P | PGT_RW);
+
+  if (pdt == NULL)
+    panic(__func__, "failed to map page");
+
+  entry = (vaddr & 0x3FE00000) >> 21;
+  if ((pdt[entry] & PGT_P) == 0) {
+    new = alloc_phys_frame();
+    if (new == 0)
+      panic(__func__, "page allocation for PT failed");
+    pdt[entry] = new | PGT_P | PGT_RW;
+    pt = (uint64_t *) vm_map_page(new, PGT_P | PGT_RW);
+  } else
+    pt = (uint64_t *) vm_map_page(pdt[entry] & PGT_MASK, PGT_P | PGT_RW);
+
+  if (pt == NULL)
+    panic(__func__, "failed to map page");
+    
+  entry = (vaddr & 0x1FF000) >> 12;
+  pt[entry] = frame | flags;
 }
 
 void vm_init(void)

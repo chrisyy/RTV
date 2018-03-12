@@ -49,14 +49,16 @@ typedef struct _apic_ioapic {
 typedef struct _apic_interruptoverride {
   apic_header_t header;
   uint8_t bus;
-  uint8_t source;
-  uint32_t interrupt;
+  uint8_t irq;
+  uint32_t gsi;
   uint16_t flags;
 } PACKED apic_interruptoverride_t;
+
+#define MAX_IRQ_OVERRIDES 32
 
 extern uint16_t g_cpus;
 
 extern void acpi_init(void);
-extern uint8_t acpi_irq_map(uint8_t irq);
+extern uint32_t acpi_irq_to_gsi(uint8_t irq, uint16_t *flags);
 
 #endif

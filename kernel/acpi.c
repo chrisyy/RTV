@@ -23,14 +23,22 @@
 
 uint16_t g_cpus = 0;
 
-static acpi_madt_t *acpi_madt;
+struct {
+  uint8_t irq;
+  uint16_t flags;
+  uint32_t gsi;
+} irq_map[MAX_IRQ_OVERRIDES];
+uint8_t num_overrides = 0;
+
+static uint16_t num_ioapic = 0;
 
 static void acpi_parse_apic(acpi_madt_t *madt)
 {
   uint8_t *p, *end;
   extern uint8_t *lapic_addr;
+  extern uint8_t *ioapic_addr;
+  extern uint32_t gsi_base;
   
-  acpi_madt = madt;
   lapic_addr = (uint8_t *) (uint64_t) madt->lapic_addr;
 
   p = (uint8_t *) (madt + 1);
@@ -45,16 +53,29 @@ static void acpi_parse_apic(acpi_madt_t *madt)
       //apic_lapic_t *s = (apic_lapic_t *) p;
       //printf("Found CPU: %d %d %x\n", s->processor_id, s->apic_id, s->flags);
       ++g_cpus;
+      if (g_cpus > MAX_CPUS)
+        panic(__func__, "Exceeds supported max CPUs");
     }
     else if (type == APIC_TYPE_IOAPIC) {
-      //apic_ioapic_t *s = (apic_ioapic_t *) p;
-
+      apic_ioapic_t *s = (apic_ioapic_t *) p;
+      ioapic_addr = (uint8_t *) ((uint64_t) s->address);
+      gsi_base = s->gsi_base;
+      num_ioapic++;
+      if (num_ioapic > 1)
+        panic(__func__, "Multiple IOAPIC not supported");
       //printf("Found I/O APIC: %d 0x%08x %d\n", s->id, s->address, s->gsi_base);
-      //g_ioApicAddr = (uint8_t *)s->ioApicAddress;
     }
     else if (type == APIC_TYPE_INTERRUPT_OVERRIDE) {
-      //apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
-      //printf("Found Interrupt Override: %d %d %d 0x%04x\n", s->bus, s->source, s->interrupt, s->flags);
+      apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
+      if (s->bus != 0)
+        panic(__func__, "Only bus 0 is supported");
+      irq_map[num_overrides].irq = s->irq;
+      irq_map[num_overrides].gsi = s->gsi;
+      irq_map[num_overrides].flags = s->flags;
+      num_overrides++;
+      if (num_overrides > MAX_IRQ_OVERRIDES)
+        panic(__func__, "Exceeds supported max overrides");
+      //printf("Found Interrupt Override: %d %d %d 0x%04x\n", s->bus, s->irq, s->gsi, s->flags);
     }
     else {
       //printf("Unsupported APIC structure %d\n", type);
@@ -183,27 +204,18 @@ void acpi_init(void)
     panic(__func__, "Can't find RSDP");
 }
 
-uint8_t acpi_irq_map(uint8_t irq)
+uint32_t acpi_irq_to_gsi(uint8_t irq, uint16_t *flags)
 {
-  acpi_madt_t *madt = acpi_madt;
-
-  uint8_t *p = (uint8_t *) (madt + 1);
-  uint8_t *end = (uint8_t *) madt + madt->header.length;
-
-  while (p < end) {
-    apic_header_t *header = (apic_header_t *) p;
-    uint8_t type = header->type;
-    uint8_t length = header->length;
-
-    if (type == APIC_TYPE_INTERRUPT_OVERRIDE) {
-      apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
-
-      if (s->source == irq)
-        return s->interrupt;
+  uint8_t i;
+  for (i = 0; i < num_overrides; i++) {
+    if (irq_map[i].irq == irq) {
+      if (flags)
+        *flags = irq_map[i].flags;
+      return irq_map[i].gsi;
     }
-
-    p += length;
   }
 
-  return irq;
+  if (flags)
+    *flags = 0;
+  return (uint32_t) irq;
 }

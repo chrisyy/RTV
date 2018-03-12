@@ -1,6 +1,8 @@
 #ifndef _APIC_H_
 #define _APIC_H_
 
+#include "types.h"
+
 /* Local APIC registers */
 #define LAPIC_ID    0x20
 #define LAPIC_VER   0x30
@@ -28,8 +30,16 @@
 #define LAPIC_TCCR  0x390
 #define LAPIC_TDCR  0x3E0
 
-#define LAPIC_LDR_OFFSET 24
+#define LAPIC_ID_OFFSET   24
 
-extern void lapic_init(void);
+#define IOAPIC_REGSEL     0
+#define IOAPIC_WIN        0x10
+#define IOAPIC_ID         0
+#define IOAPIC_VER        0x1
+#define IOAPIC_ARB        0x2
+#define IOAPIC_REDTBL(n)  (0x10 + 2 * n)  //lower 32 bits (add +1 for upper 32-bits)
+
+extern void apic_init(void);
+extern uint8_t lapic_get_phys_id(uint32_t cpu);
 
 #endif
