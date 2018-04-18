@@ -105,9 +105,9 @@ _start:
   movl $pml4t, %eax
   movl %eax, %cr3 
 
-  /* enable PAE paging */
+  /* enable PAE paging and PSE */
   movl %cr4, %eax
-  orl $0x20, %eax
+  orl $0x30, %eax
   movl %eax, %cr4
 
   /* set long mode */
@@ -122,7 +122,7 @@ _start:
   movl %eax, %cr0 
 
   lgdt gdt_ptr
-  ljmp $0x8, $_start64
+  ljmp $0x8, $start64
   
   /* error */
   cli

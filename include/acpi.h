@@ -59,6 +59,7 @@ typedef struct _apic_interruptoverride {
 extern uint16_t g_cpus;
 
 extern void acpi_init(void);
+extern void acpi_sec_init(void);
 extern uint32_t acpi_irq_to_gsi(uint8_t irq, uint16_t *flags);
 
 #endif

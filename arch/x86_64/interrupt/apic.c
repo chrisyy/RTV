@@ -98,6 +98,37 @@ uint8_t lapic_get_phys_id(uint32_t cpu)
   return lapic_phys_ids[cpu];
 }
 
+void lapic_eoi(void)
+{
+  lapic_write32(LAPIC_EOI, 0);
+}
+
+void lapic_send_ipi(uint32_t dest, uint32_t vector)
+{
+  uint64_t flag;
+
+  /* 
+   * It is a bad idea to have interrupts enabled while 
+   * twiddling the LAPIC. 
+   */
+  //TODO
+  //interrupt_disable_save(&flag);
+
+  lapic_write32(LAPIC_ICRH, dest << LAPIC_ID_OFFSET);
+  lapic_write32(LAPIC_ICR, vector);
+
+  uint64_t timeout = 0;
+  uint32_t send_status;
+  do {
+    send_status = lapic_read32(LAPIC_ICR) & LAPIC_ICR_STATUS_PEND;
+  } while (send_status && (timeout++ < 1000));
+
+  if (timeout >= 1000)
+    printf("timeout\n");
+
+  //interrupt_enable_restore(flag);
+}
+
 void lapic_init(void) 
 {
   uint32_t cpu;

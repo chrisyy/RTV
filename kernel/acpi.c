@@ -20,17 +20,56 @@
 #include "utils/screen.h"
 #include "helper.h"
 #include "vm.h"
+#include "percpu.h"
+#include "apic.h"
+#include "smp.h"
 
-uint16_t g_cpus = 0;
+uint16_t g_cpus = 1;
 
 struct {
   uint8_t irq;
   uint16_t flags;
   uint32_t gsi;
 } irq_map[MAX_IRQ_OVERRIDES];
+
 uint8_t num_overrides = 0;
 
 static uint16_t num_ioapic = 0;
+static uint8_t lapic_ids[MAX_CPUS];
+
+extern uint8_t ap_boot_start[], ap_boot_end[];
+
+void acpi_sec_init(void)
+{
+  uint16_t i, count = 0;
+
+  if (g_cpus > 1)
+    memcpy((uint8_t *) SMP_BOOT_ADDR, ap_boot_start, ap_boot_end - ap_boot_start);
+
+  for (i = 1; i < g_cpus; i++) {
+    if (!smp_boot_cpu(lapic_ids[i])) {
+      printf("%s: Failed to boot cpu %u\n", __func__, lapic_ids[i]);
+      count++;
+    }
+  }
+  g_cpus -= count;
+}
+
+static bool acpi_add_cpu(apic_lapic_t *info)
+{
+  /* cpu disabled */
+  if (!(info->flags & 1))
+    return true;
+  /* BSP */
+  if (info->apic_id == lapic_get_phys_id(get_pcpu_id()))
+    return false;
+
+  lapic_ids[g_cpus++] = info->apic_id;
+  if (g_cpus > MAX_CPUS)
+    panic(__func__, "Exceeds supported max CPUs");
+
+  return true;
+}
 
 static void acpi_parse_apic(acpi_madt_t *madt)
 {
@@ -50,13 +89,10 @@ static void acpi_parse_apic(acpi_madt_t *madt)
     uint8_t length = header->length;
 
     if (type == APIC_TYPE_LAPIC) {
-      //apic_lapic_t *s = (apic_lapic_t *) p;
+      apic_lapic_t *s = (apic_lapic_t *) p;
+      acpi_add_cpu(s);
       //printf("Found CPU: %d %d %x\n", s->processor_id, s->apic_id, s->flags);
-      ++g_cpus;
-      if (g_cpus > MAX_CPUS)
-        panic(__func__, "Exceeds supported max CPUs");
-    }
-    else if (type == APIC_TYPE_IOAPIC) {
+    } else if (type == APIC_TYPE_IOAPIC) {
       apic_ioapic_t *s = (apic_ioapic_t *) p;
       ioapic_addr = (uint8_t *) ((uint64_t) s->address);
       gsi_base = s->gsi_base;
@@ -64,8 +100,7 @@ static void acpi_parse_apic(acpi_madt_t *madt)
       if (num_ioapic > 1)
         panic(__func__, "Multiple IOAPIC not supported");
       //printf("Found I/O APIC: %d 0x%08x %d\n", s->id, s->address, s->gsi_base);
-    }
-    else if (type == APIC_TYPE_INTERRUPT_OVERRIDE) {
+    } else if (type == APIC_TYPE_INTERRUPT_OVERRIDE) {
       apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
       if (s->bus != 0)
         panic(__func__, "Only bus 0 is supported");
@@ -76,8 +111,7 @@ static void acpi_parse_apic(acpi_madt_t *madt)
       if (num_overrides > MAX_IRQ_OVERRIDES)
         panic(__func__, "Exceeds supported max overrides");
       //printf("Found Interrupt Override: %d %d %d 0x%04x\n", s->bus, s->irq, s->gsi, s->flags);
-    }
-    else {
+    } else {
       //printf("Unsupported APIC structure %d\n", type);
     }
 
@@ -182,11 +216,11 @@ static bool acpi_parse_rsdp(uint8_t *p)
 
 void acpi_init(void)
 {
-  // TODO - Search Extended BIOS Data Area
+  uint8_t *p, *end;
 
   /* Search main BIOS area below 1MB */
-  uint8_t *p = (uint8_t *) 0x000e0000;
-  uint8_t *end = (uint8_t *) 0x000fffff;
+  p = (uint8_t *) 0x000e0000;
+  end = (uint8_t *) 0x000fffff;
 
   while (p < end) {
     uint64_t signature = *(uint64_t *)p;
@@ -202,6 +236,8 @@ void acpi_init(void)
 
   if (p >= end)
     panic(__func__, "Can't find RSDP");
+
+  //TODO - Search Extended BIOS Data Area
 }
 
 uint32_t acpi_irq_to_gsi(uint8_t irq, uint16_t *flags)

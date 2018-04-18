@@ -34,6 +34,8 @@ INIT_PER_CPU(pcpu_id) {
   percpu_write(pcpu_id, pcpu_counter++);
 }
 
+DEF_PER_CPU(tss_t, cpu_tss);
+
 void percpu_init(void)
 {
   uint16_t i;

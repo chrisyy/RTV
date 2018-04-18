@@ -57,6 +57,13 @@ void idt_init(void)
 void isr_handler(uint64_t irq)
 {
   printf("interrupt %u\n", irq);
+
+  switch (irq) {
+  case EXCEPTION_PG_FAULT:
+    //TODO
+    break;
+  }
+
   while (1);
   //TODO: EOI
 }

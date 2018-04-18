@@ -14,6 +14,8 @@
 
 #define PIT_IRQ   0
 
+#define EXCEPTION_PG_FAULT  14
+
 void interrupt_init(void);
 
 static inline void interrupt_enable(void)
@@ -25,5 +27,20 @@ static inline void interrupt_disable(void)
 {
   __asm__ volatile("cli");
 }
+
+static inline void interrupt_disable_save(uint64_t *flag)
+{
+  __asm__ volatile("pushfq\n"
+                   "cli\n"
+                   "popq %0\n" : "=a" (*flag) : : );
+}
+
+static inline void interrupt_enable_restore(uint64_t flag)
+{
+  __asm__ volatile("pushq %0\n"
+                   "popfq\n" : : "a" (flag) : );
+}
+
+
 
 #endif

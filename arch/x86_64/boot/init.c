@@ -24,11 +24,12 @@
 #include "apic.h"
 #include "mm/physical.h"
 #include "percpu.h"
-
-/* percpu */
-DEF_PER_CPU(tss_t, cpu_tss);
+#include "smp.h"
 
 extern uint8_t kernel_stack[PG_SIZE];
+extern uint64_t _boot_start, _boot_pages; 
+extern uint64_t _kernel_ro_pages, _kernel_rw_pages;
+extern uint8_t ap_boot_start[], ap_boot_end[];
 
 void kernel_main(uint64_t magic, uint64_t mbi)
 {
@@ -36,8 +37,6 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   uint16_t selector;
   uint64_t mem_end, mem_limit = 0;
   tss_t *tss_ptr;
-  extern uint64_t _boot_start, _boot_pages; 
-  extern uint64_t _kernel_ro_pages, _kernel_rw_pages;
 
   /* multiboot2 */
   if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
@@ -69,6 +68,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
         //printf("base_addr = 0x%llx, length = 0x%llx, type = 0x%x\n",
         //       mmap->addr, mmap->len, mmap->type);
       }
+
       break;
     }
     case MULTIBOOT_TAG_TYPE_FRAMEBUFFER: {
@@ -79,6 +79,9 @@ void kernel_main(uint64_t magic, uint64_t mbi)
     }
     }
   }
+
+  //TODO: check SMP_BOOT_ADDR in free area
+  //smp_boot_addr = (mem_end - (uint64_t) (ap_boot_end - ap_boot_start)) & PG_MASK;
 
   physical_take_range((uint64_t) &_boot_start, ((uint64_t) &_boot_pages
                       + (uint64_t) &_kernel_ro_pages
@@ -95,10 +98,10 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   apic_init();
 
+  acpi_sec_init();
+
   printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
 
-  //cpu_tss.rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
-  //selector = alloc_tss_desc(&cpu_tss);
   tss_ptr = percpu_pointer(get_pcpu_id(), cpu_tss);
   tss_ptr->rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
   selector = alloc_tss_desc(tss_ptr);

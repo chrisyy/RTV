@@ -5,6 +5,7 @@
 
 #define PG_BITS 12
 #define PG_SIZE (1 << PG_BITS)
+#define PG_MASK (~((uint64_t) PG_SIZE - 1))
 
 /* flags of page table entry */
 #define PGT_P   0x1

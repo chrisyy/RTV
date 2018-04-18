@@ -2,6 +2,7 @@
 #define _PERCPU_H_
 
 #include "helper.h"
+#include "cpu.h"
 
 #define PER_CPU_SEG_STR "fs"
 
@@ -76,6 +77,7 @@ extern uint8_t *percpu_virt[MAX_CPUS];
 #define percpu_pointer(cpu, var) ((void *) (&percpu_virt[(cpu)][(uint64_t) &(var)]))
 
 extern DEF_PER_CPU(uint16_t, pcpu_id);
+extern DEF_PER_CPU(tss_t, cpu_tss);
 
 extern void percpu_init(void);
 

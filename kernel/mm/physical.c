@@ -78,7 +78,7 @@ uint64_t alloc_phys_frame(void)
   /* return 0 indicate failure, so skip the first entry */
   for (i = 1; i < entry_end; i++) {
     if (mm_table[i]) {
-      uint64_t pos = 0;
+      uint8_t pos = 0;
       uint64_t data = mm_table[i];
       data = data & (-data);
       data >>= 1;

@@ -14,12 +14,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include "smp.h"
 
   .section .text
 
-  .global _start64
-_start64:
-  /* Set segment registers to GDT data descriptor */
+  .global start64
+start64:
+  /* set segment registers to GDT data descriptor */
   movw $16, %ax
   movw %ax, %ds
   movw %ax, %es
