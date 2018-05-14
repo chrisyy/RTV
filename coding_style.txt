@@ -20,10 +20,8 @@ avoid using size_t
 (use upper case for constant hex numbers)
 int *ptr = 0xFC01;
 
+type casting:
 type_a X = (type_a) Y;
-
-type_ljiemsenoicpeo X
-  = 18204850238;
 
 type_a *X = (type_a *) Y;
 *Y = 38054;
@@ -108,7 +106,7 @@ __asm__ volatile("abc" : y : "a" (x) : z);
 
 __asm__ volatile("abc" : y 
                  : "a" (x) : z);
-(instead of use 'asm')
+(instead of using 'asm')
 
 
 Function naming: lower case 

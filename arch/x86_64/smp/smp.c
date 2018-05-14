@@ -19,6 +19,7 @@
 #include "mm/physical.h"
 #include "helper.h"
 #include "apic.h"
+#include "percpu.h"
 
 extern uint8_t status_code[], ap_stack_ptr[];
 extern uint8_t ap_boot_start[];
@@ -64,6 +65,7 @@ bool smp_boot_cpu(uint8_t lapic)
   lapic_send_ipi(lapic, LAPIC_ICR_DM_SIPI | ((SMP_BOOT_ADDR >> 12) & 0xFF));
 
   /* check for successful start */
+  //TODO: use time instead of iterations
   cnt = 0;
   while (!BOOT_STATUS() && cnt++ < LOOPS_TO_WAIT) {
      __asm__ volatile("");
@@ -78,6 +80,23 @@ bool smp_boot_cpu(uint8_t lapic)
 
 void ap_main(void)
 {
-  //printf("%s\n", __func__);
+  tss_t *tss_ptr;
+  uint64_t stack;
+  uint16_t selector;
+
+  percpu_init();
+
+  lapic_init();
+
+  //lapic_send_ipi(lapic_get_phys_id(0), LAPIC_ICR_LEVELASSERT | LAPIC_ICR_DM_NMI);
+
+  tss_ptr = percpu_pointer(get_pcpu_id(), cpu_tss);
+  __asm__ volatile("movq %%rsp, %0" : "=a" (stack) : : );
+  stack &= PG_MASK;
+  stack += PG_SIZE;
+  tss_ptr->rsp[0] = stack;
+  selector = alloc_tss_desc(tss_ptr);
+  load_tr(selector);
+
   while(1);
 }

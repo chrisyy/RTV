@@ -20,6 +20,7 @@
 #include "io.h"
 #include "utils/screen.h"
 #include "vm.h"
+#include "apic.h"
 
 idt_entry idt64[IDT_ENTRY_NR] ALIGNED(PG_SIZE);
 idt_desc idtr;
@@ -57,6 +58,7 @@ void idt_init(void)
 void isr_handler(uint64_t irq)
 {
   printf("interrupt %u\n", irq);
+  lapic_eoi();
 
   switch (irq) {
   case EXCEPTION_PG_FAULT:
@@ -65,7 +67,6 @@ void isr_handler(uint64_t irq)
   }
 
   while (1);
-  //TODO: EOI
 }
 
 void pit_init(void)

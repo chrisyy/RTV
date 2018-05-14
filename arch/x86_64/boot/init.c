@@ -80,8 +80,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
     }
   }
 
-  //TODO: check SMP_BOOT_ADDR in free area
-  //smp_boot_addr = (mem_end - (uint64_t) (ap_boot_end - ap_boot_start)) & PG_MASK;
+  //TODO: check if SMP_BOOT_ADDR is free memory
 
   physical_take_range((uint64_t) &_boot_start, ((uint64_t) &_boot_pages
                       + (uint64_t) &_kernel_ro_pages
@@ -96,7 +95,9 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   acpi_init();
 
-  apic_init();
+  lapic_init();
+
+  ioapic_init();
 
   acpi_sec_init();
 

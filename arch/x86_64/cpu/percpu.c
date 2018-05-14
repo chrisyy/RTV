@@ -44,10 +44,12 @@ void percpu_init(void)
   uint64_t limit;
   uint64_t start_frame;
 
-  /* workaround: GCC will eliminate this if-statement when the check
+  /* 
+   * workaround: GCC will eliminate this if-statement when the check
    * is (pages == 0) because it thinks it knows the address of a
    * symbol can never be zero. So, check (pages + 1 == 1) and then
-   * subtract one. */
+   * subtract one. 
+   */
   if (pages == 1) {
     /* no per-CPU data, fall back to the usual data segment */
     __asm__ volatile("movw %%ds, %%ax\n"
@@ -96,7 +98,6 @@ void percpu_init(void)
 
   /* invoke initialization functions */
   void (**ctor)();
-  for (ctor = &_percpu_ctors; *ctor; ctor++) {
+  for (ctor = &_percpu_ctors; *ctor; ctor++) 
     (*ctor)();
-  }
 }

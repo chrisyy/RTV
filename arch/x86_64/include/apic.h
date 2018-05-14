@@ -55,7 +55,8 @@
 #define IOAPIC_ARB        0x2
 #define IOAPIC_REDTBL(n)  (0x10 + 2 * n)  //lower 32 bits (add +1 for upper 32-bits)
 
-extern void apic_init(void);
+extern void lapic_init(void);
+extern void ioapic_init(void);
 extern uint8_t lapic_get_phys_id(uint32_t cpu);
 extern void lapic_eoi(void);
 extern void lapic_send_ipi(uint32_t dest, uint32_t vector);

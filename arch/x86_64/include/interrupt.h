@@ -12,9 +12,9 @@
 #define PIT_FREQ 1193182
 #define HZ 100
 
-#define PIT_IRQ   0
+#define PIT_IRQ 0
 
-#define EXCEPTION_PG_FAULT  14
+#define EXCEPTION_PG_FAULT 14
 
 void interrupt_init(void);
 

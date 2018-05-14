@@ -93,6 +93,7 @@ static inline uint8_t lapic_get_phys_id_raw(void)
   return (uint8_t) ((lapic_read32(LAPIC_ID) >> LAPIC_ID_OFFSET) & 0xF);
 }
 
+/* return LAPIC ID */
 uint8_t lapic_get_phys_id(uint32_t cpu)
 {
   return lapic_phys_ids[cpu];
@@ -103,6 +104,7 @@ void lapic_eoi(void)
   lapic_write32(LAPIC_EOI, 0);
 }
 
+/* dest: LAPIC ID */
 void lapic_send_ipi(uint32_t dest, uint32_t vector)
 {
   uint64_t flag;
@@ -111,31 +113,31 @@ void lapic_send_ipi(uint32_t dest, uint32_t vector)
    * It is a bad idea to have interrupts enabled while 
    * twiddling the LAPIC. 
    */
-  //TODO
-  //interrupt_disable_save(&flag);
+  interrupt_disable_save(&flag);
 
   lapic_write32(LAPIC_ICRH, dest << LAPIC_ID_OFFSET);
   lapic_write32(LAPIC_ICR, vector);
 
-  uint64_t timeout = 0;
-  uint32_t send_status;
-  do {
-    send_status = lapic_read32(LAPIC_ICR) & LAPIC_ICR_STATUS_PEND;
-  } while (send_status && (timeout++ < 1000));
-
-  if (timeout >= 1000)
-    printf("timeout\n");
-
-  //interrupt_enable_restore(flag);
+  interrupt_enable_restore(flag);
 }
 
 void lapic_init(void) 
 {
   uint32_t cpu;
   uint32_t eax, ebx, ecx;
+  cpu = get_pcpu_id();
 
-  /* identity mapping for LAPIC */
-  vm_map_page_unrestricted((uint64_t) lapic_addr, PGT_P | PGT_RW | PGT_PCD | PGT_PWT, (uint64_t) lapic_addr);
+  if (cpu == 0) {
+    /* identity mapping for LAPIC */
+    vm_map_page_unrestricted((uint64_t) lapic_addr, PGT_P | PGT_RW | PGT_PCD | PGT_PWT, (uint64_t) lapic_addr);
+
+    /* get timer frequency: (ebx/eax)*ecx */
+    cpuid(0x15, 0, &eax, &ebx, &ecx, NULL);
+    if (ecx == 0 || ebx == 0)
+      panic(__func__, "No TSC frequency info");
+    tsc_freq = (ecx * ebx) / eax;
+    printf("TSC freq: %u\n", tsc_freq);
+  }
 
   //printf("%s: %u\n", __func__, lapic_read32(LAPIC_VER));
 
@@ -147,17 +149,7 @@ void lapic_init(void)
   lapic_write32(LAPIC_LVTE, 0x10000);  /* disable error interrupts */
   lapic_write32(LAPIC_SPIV, 0x0010F);  /* enable APIC: spurious vector = 0xF */
 
-  cpu = get_pcpu_id();
   lapic_phys_ids[cpu] = lapic_get_phys_id_raw();
-
-  if (cpu == 0) {
-    /* get timer frequency: (ebx/eax)*ecx  */
-    cpuid(0x15, 0, &eax, &ebx, &ecx, NULL);
-    if (ecx == 0 || ebx == 0)
-      panic(__func__, "No TSC frequency info");
-    tsc_freq = (ecx * ebx) / eax;
-    printf("TSC freq: %u\n", tsc_freq);
-  }
 }
 
 void ioapic_init(void)
@@ -165,6 +157,10 @@ void ioapic_init(void)
   uint32_t i, gsi;
   uint16_t flags;
   uint64_t entry;
+
+  /* disable PIC before using IOAPIC */
+  outb(PIC1_DATA, 0xFF);
+  outb(PIC2_DATA, 0xFF);
 
   /* identity mapping for IOAPIC */
   vm_map_page_unrestricted((uint64_t) ioapic_addr, PGT_P | PGT_RW | PGT_PCD | PGT_PWT, (uint64_t) ioapic_addr);
@@ -186,14 +182,4 @@ void ioapic_init(void)
     entry |= 0x8000;
   /* map PIT timer IRQ to vector 0x20 */
   ioapic_map_gsi(gsi, 0x20, entry);
-}
-
-void apic_init(void)
-{
-  /* disable PIC before using APIC */
-  outb(PIC1_DATA, 0xFF);
-  outb(PIC2_DATA, 0xFF);
-
-  lapic_init();
-  ioapic_init();
 }
