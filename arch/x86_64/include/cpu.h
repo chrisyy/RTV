@@ -77,6 +77,11 @@ static inline void halt(void)
   __asm__ volatile("hlt");
 }
 
+static inline void pause(void)
+{
+  __asm__ volatile("pause" : : : "memory");
+}
+
 static inline void load_tr(uint16_t selector)
 {
   __asm__ volatile("ltr %0" : : "r" (selector));
@@ -113,7 +118,7 @@ static inline void wrmsr(uint32_t ecx, uint64_t val)
   edx = (uint32_t) (val >> 32);
   eax = (uint32_t) val;
 
-  __asm__ volatile ("wrmsr" : : "d" (edx), "a" (eax), "c" (ecx));
+  __asm__ volatile("wrmsr" : : "d" (edx), "a" (eax), "c" (ecx));
 }
 
 #endif /* __ASSEMBLER__ */

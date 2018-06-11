@@ -25,6 +25,7 @@
 #include "mm/physical.h"
 #include "percpu.h"
 #include "smp.h"
+#include "utils/spinlock.h"
 
 extern uint8_t kernel_stack[PG_SIZE];
 extern uint64_t _boot_start, _boot_pages; 

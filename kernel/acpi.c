@@ -16,7 +16,7 @@
  */
 
 #include "acpi.h"
-#include "asm/asm-string.h"
+#include "asm-string.h"
 #include "utils/screen.h"
 #include "helper.h"
 #include "vm.h"
