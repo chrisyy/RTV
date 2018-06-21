@@ -75,8 +75,8 @@ uint64_t alloc_phys_frame(void)
 {
   uint64_t i;
 
-  /* return 0 indicate failure, so skip the first entry */
-  for (i = 1; i < entry_end; i++) {
+  /* skip the first 1MB */
+  for (i = 4; i < entry_end; i++) {
     if (mm_table[i]) {
       uint8_t pos = 0;
       uint64_t data = mm_table[i];
@@ -100,8 +100,8 @@ uint64_t alloc_phys_frames(uint64_t num)
 {
   uint64_t i, pos, count;
 
-  /* return 0 indicate failure, so skip the first entry */
-  for (i = 1, pos = 64; i < entry_end; ) {
+  /* skip the first 1MB */
+  for (i = 4, pos = 256; i < entry_end; ) {
     if (mm_table[i]) {
       uint64_t cur;
 

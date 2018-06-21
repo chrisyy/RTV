@@ -31,6 +31,8 @@ extern uint64_t _percpu_pages_plus_one;
 
 DEF_PER_CPU(uint16_t, pcpu_id);
 INIT_PER_CPU(pcpu_id) {
+  printf("%llx, %llx\n", &pcpu_id, &pcpu_counter);
+  //while(1);
   percpu_write(pcpu_id, pcpu_counter++);
 }
 
@@ -70,10 +72,10 @@ void percpu_init(void)
   start_frame = alloc_phys_frames(pages);
   if (start_frame == 0) 
     panic(__func__, "out of physical RAM");
+
   uint64_t start_virt = (uint64_t) vm_map_pages(start_frame, pages, PGT_P | PGT_RW);
   if (start_virt == 0) 
     panic(__func__, "out of virtual addresses");
-
   percpu_virt[pcpu_counter] = (uint8_t *) start_virt;
 
   seg_desc seg = {
@@ -94,7 +96,11 @@ void percpu_init(void)
   memcpy(&gdt64[i], &seg, sizeof(seg_desc));
 
   i <<= 3;
-  asm volatile("movw %0, %%"PER_CPU_SEG_STR"\n" : : "r" (i));
+  __asm__ volatile("movw %0, %%"PER_CPU_SEG_STR"\n" : : "r" (i));
+
+  uint16_t tmp = 0;
+  __asm__ volatile("movw %%fs, %0" : "=m" (tmp));
+  printf("fs: %u\n", tmp);
 
   /* invoke initialization functions */
   void (**ctor)();

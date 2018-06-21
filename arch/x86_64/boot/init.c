@@ -29,7 +29,7 @@
 
 extern uint8_t kernel_stack[PG_SIZE];
 extern uint64_t _boot_start, _boot_pages; 
-extern uint64_t _kernel_ro_pages, _kernel_rw_pages;
+extern uint64_t _kernel_code_pages, _kernel_ro_pages, _kernel_rw_pages;
 extern uint8_t ap_boot_start[], ap_boot_end[];
 
 void kernel_main(uint64_t magic, uint64_t mbi)
@@ -84,13 +84,14 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   //TODO: check if SMP_BOOT_ADDR is free memory
 
   physical_take_range((uint64_t) &_boot_start, ((uint64_t) &_boot_pages
+                      + (uint64_t) &_kernel_code_pages
                       + (uint64_t) &_kernel_ro_pages
                       + (uint64_t) &_kernel_rw_pages) * PG_SIZE);
   physical_set_limit(mem_limit);
 
   interrupt_init();
 
-  vm_init();
+  vm_init(); 
 
   percpu_init();
 
@@ -101,6 +102,8 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   ioapic_init();
 
   acpi_sec_init();
+
+  //TODO: unmap the first 2MB identity mapping
 
   printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
 

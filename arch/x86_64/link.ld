@@ -36,7 +36,7 @@ SECTIONS
   _kernel_start_pa = ALIGN(4K);
   _boot_pages = (_kernel_start_pa - _boot_start) / 0x1000;
 
-  _kernel_start_va = _kernel_start_pa;
+  _kernel_start_va = 2M;
   . = _kernel_start_va;
 
   .text : AT(_kernel_start_pa) ALIGN(4K)
@@ -76,7 +76,8 @@ SECTIONS
   }
   _bss_end = ALIGN(4K);
 
-  _kernel_ro_pages = (_rodata_end - _kernel_start_va) / 0x1000;
+  _kernel_code_pages = (_percpu_ctors_end - _text) / 0x1000;
+  _kernel_ro_pages = (_rodata_end - _rodata) / 0x1000;
   _kernel_rw_pages = (_bss_end - _data) / 0x1000;
 
   .eh_frame : AT(LOADADDR(.bss) + _bss_end - _bss) ALIGN(4K)

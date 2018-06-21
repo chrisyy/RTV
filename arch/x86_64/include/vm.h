@@ -20,8 +20,8 @@
 
 #define PGT_MASK 0xFFFFFFFFFFFFF000
 
-/* first 4MB is identity mapping for kernel, this 2MB is for dynamic mapping */
-#define KERNEL_MAPPING_BASE 0x400000
+/* 2~6 MB is static mapping for kernel, this 2MB is for dynamic mapping */
+#define KERNEL_MAPPING_BASE 0x600000
 
 extern void vm_init(void);
 extern void *vm_map_page(uint64_t frame, uint64_t flags);

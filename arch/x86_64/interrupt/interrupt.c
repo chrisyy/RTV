@@ -55,17 +55,17 @@ void idt_init(void)
   __asm__ volatile("lidt %0" : : "m" (idtr) : "memory");
 }
 
+void exp_handler(uint64_t irq, uint64_t *regs)
+{
+  printf("exception %u\n", irq);
+  while (1);
+}
+
 void isr_handler(uint64_t irq)
 {
   printf("interrupt %u\n", irq);
-  lapic_eoi();
-
-  switch (irq) {
-  case EXCEPTION_PG_FAULT:
-    //TODO
-    break;
-  }
-
+  //TODO
+  //lapic_eoi();
   while (1);
 }
 

@@ -53,8 +53,18 @@
   popq %rax;
 
 
+#define EXP(n)          \
+  .global isr##n;       \
+isr##n:                 \
+  REG_SAVE;             \
+  movq %rsp, %rsi;      \
+  movq $0x##n, %rdi;    \
+  call exp_handler;     \
+  REG_RESTORE;          \
+  iretq;
+
 #define INT(n)          \
-  .global isr##n;        \
+  .global isr##n;       \
 isr##n:                 \
   REG_SAVE;             \
   movq $0x##n, %rdi;    \
@@ -63,27 +73,28 @@ isr##n:                 \
   iretq;
 
 
-INT(0)
-INT(1)
-INT(2)
-INT(3)
-INT(4)
-INT(5)
-INT(6)
-INT(7)
-INT(8)
-INT(9)
-INT(a)
-INT(b)
-INT(c)
-INT(d)
-INT(e)
-INT(f)
-INT(10)
-INT(11)
-INT(12)
-INT(13)
-INT(14)
+EXP(0)
+EXP(1)
+EXP(2)
+EXP(3)
+EXP(4)
+EXP(5)
+EXP(6)
+EXP(7)
+EXP(8)
+EXP(9)
+EXP(a)
+EXP(b)
+EXP(c)
+EXP(d)
+EXP(e)
+EXP(f)
+EXP(10)
+EXP(11)
+EXP(12)
+EXP(13)
+EXP(14)
+
 INT(15)
 INT(16)
 INT(17)

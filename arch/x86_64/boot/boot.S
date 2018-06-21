@@ -27,6 +27,7 @@
   .comm pml4t, 0x1000
   .comm pdpt, 0x1000
   .comm pdt, 0x1000
+  .comm kernel_page_tables, 0x2000
 
   .global kernel_stack
 kernel_stack:
@@ -84,24 +85,71 @@ _start:
   andl $0x7FFFFFFF, %eax
   movl %eax, %cr0
 
-  /* set up first 4MB identity mapping */
-  //TODO: set up n MB mapping instead, based on the size of kernel
-  //need to change KERNEL_MAPPING_BASE as well
-  movl $pdpt, %eax
-  orl $0x3, %eax  /* present+write bits */
+  /* set up first 2MB identity mapping */
+  movl $pdpt + 3, %eax  /* present+write bits */
   movl %eax, pml4t
 
-  movl $pdt, %eax
-  orl $0x3, %eax
+  movl $pdt + 3, %eax
   movl %eax, pdpt
 
   movl $0x83, %eax  /* 2MB page */
   movl %eax, pdt
 
-  movl $0x200000, %eax
-  orl $0x83, %eax   /* 2MB page */
+#if 0
+  movl $0x200083, %eax
   movl %eax, pdt + 8
 
+  movl $0x400083, %eax
+  movl %eax, pdt + 16
+#endif
+
+#if 1
+  /* set up kernel mapping from address 2MB, size limited to 4MB */
+  movl $kernel_page_tables + 3, %eax
+  movl %eax, pdt + 8
+
+  addl $0x1000, %eax
+  movl %eax, pdt + 16
+
+  movl $kernel_page_tables, %edi
+
+  /* code */
+  movl $_kernel_start_pa + 1, %eax  /* present bit */
+  movl $_kernel_code_pages, %ecx
+1:
+  stosl
+  addl $0x1000, %eax
+  movl %eax, %ebx
+  movl $0, %eax
+  stosl
+  movl %ebx, %eax
+  loop 1b
+
+  /* ro data */
+  movl $_kernel_ro_pages, %ecx
+1:
+  stosl
+  addl $0x1000, %eax
+  movl %eax, %ebx
+  movl $0, %eax
+  stosl
+  movl %ebx, %eax
+  loop 1b
+
+  /* rw data */
+  orl $0x3, %eax  /* present+write bits */
+  movl $_kernel_rw_pages, %ecx
+1:
+  stosl
+  addl $0x1000, %eax
+  movl %eax, %ebx
+  movl $0, %eax
+  stosl
+  movl %ebx, %eax
+  loop 1b
+#endif
+
+  /* install paging struct */
   movl $pml4t, %eax
   movl %eax, %cr3 
 
