@@ -97,5 +97,5 @@ ap_boot64:
 
 ap_gdt_ptr:  
   .short (GDT_ENTRY_NR * 8) - 1
-  .quad gdt64
+  .quad _kernel_gdt
 ap_boot_end:

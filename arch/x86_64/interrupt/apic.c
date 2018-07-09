@@ -129,7 +129,9 @@ void lapic_init(void)
 
   if (cpu == 0) {
     /* identity mapping for LAPIC */
-    vm_map_page_unrestricted((uint64_t) lapic_addr, PGT_P | PGT_RW | PGT_PCD | PGT_PWT, (uint64_t) lapic_addr);
+    vm_map_page_unrestricted((uint64_t) lapic_addr, 
+                             PGT_P | PGT_RW | PGT_PCD | PGT_PWT, 
+                             (uint64_t) lapic_addr);
 
     /* get timer frequency: (ebx/eax)*ecx */
     cpuid(0x15, 0, &eax, &ebx, &ecx, NULL);
@@ -163,7 +165,9 @@ void ioapic_init(void)
   outb(PIC2_DATA, 0xFF);
 
   /* identity mapping for IOAPIC */
-  vm_map_page_unrestricted((uint64_t) ioapic_addr, PGT_P | PGT_RW | PGT_PCD | PGT_PWT, (uint64_t) ioapic_addr);
+  vm_map_page_unrestricted((uint64_t) ioapic_addr, 
+                           PGT_P | PGT_RW | PGT_PCD | PGT_PWT, 
+                           (uint64_t) ioapic_addr);
 
   //printf("%s: %u\n", __func__, ioapic_read32(IOAPIC_VER));
 

@@ -18,16 +18,17 @@
 #include "cpu.h"
 #include "helper.h"
 
-extern seg_desc gdt64[GDT_ENTRY_NR];
 
 uint16_t alloc_tss_desc(tss_t *tss_p)
 {
   uint16_t i;
   uint32_t limit = sizeof(tss_t) - 1;
+  seg_desc *gdt_ptr = get_gdt();
 
-  for (i = GDT_START; i < GDT_ENTRY_NR; i++) {
-    if (!gdt64[i].p) {
-      tss_desc *entry = (tss_desc *) &gdt64[i];
+  /* TSS desc takes 16B */
+  for (i = GDT_START; i < GDT_ENTRY_NR - 1; i++) {
+    if (!gdt_ptr[i].p && !gdt_ptr[i + 1].p) {
+      tss_desc *entry = (tss_desc *) &gdt_ptr[i];
       /* legal range: base -> base + limit */
       entry->limit0 = limit & 0xFFFF;
       entry->limit1 = (limit >> 16) & 0xF;
@@ -41,6 +42,9 @@ uint16_t alloc_tss_desc(tss_t *tss_p)
       entry->zero1 = 0;
       entry->g = 0;
       entry->reserved0 = 0;
+
+      /* mark the second 8B used */
+      gdt_ptr[i + 1].p = 1;
       return i << 3;
     }
   }

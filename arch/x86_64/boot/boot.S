@@ -29,13 +29,12 @@
   .comm pdt, 0x1000
   .comm kernel_page_tables, 0x2000
 
-  .global kernel_stack
-kernel_stack:
+tmp_stack:
   .skip 0x1000
 stack_top:
 
   .section .data
-  .global gdt64
+  .align 0x1000
 gdt64:
   /* null descriptor as required */
   .quad 0
@@ -43,13 +42,17 @@ gdt64:
   .quad 0x00209A0000000000
   /* data */
   .quad 0x0000920000000000
-  /* 4KB GDT */
   .rept GDT_ENTRY_NR - 3
   .quad 0
   .endr
+idt64:
+  .rept IDT_ENTRY_NR
+  .quad 0
+  .quad 0
+  .endr
 gdt_ptr:
-  .short . - gdt64 - 1
-  .quad gdt64
+  .short (GDT_ENTRY_NR * 8) - 1
+  .quad _kernel_gdt
 
   .section .rodata
 msg:
@@ -95,15 +98,6 @@ _start:
   movl $0x83, %eax  /* 2MB page */
   movl %eax, pdt
 
-#if 0
-  movl $0x200083, %eax
-  movl %eax, pdt + 8
-
-  movl $0x400083, %eax
-  movl %eax, pdt + 16
-#endif
-
-#if 1
   /* set up kernel mapping from address 2MB, size limited to 4MB */
   movl $kernel_page_tables + 3, %eax
   movl %eax, pdt + 8
@@ -147,7 +141,22 @@ _start:
   stosl
   movl %ebx, %eax
   loop 1b
-#endif
+
+  /* map GDT */
+  movl $gdt64 + 3, %eax /* present+write bits */
+  stosl
+  movl $0, %eax
+  stosl
+
+  /* map IDT */
+  movl $idt64 + 3, %eax /* present+write bits */
+  stosl
+  movl $0, %eax
+  stosl
+
+  /* set up Recursive Mapping in the last entry */
+  movl $pml4t + 3, %eax
+  movl %eax, pml4t + 4088
 
   /* install paging struct */
   movl $pml4t, %eax
@@ -170,6 +179,14 @@ _start:
   movl %eax, %cr0 
 
   lgdt gdt_ptr
+
+  /* switch to stack with virtual address */
+  popl %ebx
+  popl %eax
+  movl $kernel_stack + 0x1000, %esp
+  pushl %eax
+  pushl %ebx
+
   ljmp $0x8, $start64
   
   /* error */

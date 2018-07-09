@@ -26,6 +26,9 @@ type_a X = (type_a) Y;
 type_a *X = (type_a *) Y;
 *Y = 38054;
 
+X = aabbccdd + eeffgghh
+    + hhiijjkk;
+
 when there is only one line inside a if/else/for/while, no brackets, but in two separate lines:
 if (x)
   foo();
@@ -81,6 +84,9 @@ y = foo(a, b, c,
 declaration: with argument names
 extern void foo(int a, int b);
 
+For functions without arguments:
+foo(void);
+
 MACRO: capital letter
 #define XYZ 12
 #define DDDDD (12 * 10)
@@ -110,9 +116,6 @@ __asm__ volatile("abc" : y
 
 
 Function naming: lower case 
-for external-facing interface of a module, add the module name:
-int module_action(...)
-
 Type naming: lower case
 
 Variables defined at the top of its scope:

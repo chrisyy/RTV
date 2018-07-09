@@ -1,7 +1,7 @@
 #ifndef _CPU_H_
 #define _CPU_H_
 
-/* 4KB GDT */
+/* 4KB GDT/IDT */
 #define GDT_ENTRY_NR 512
 #define IDT_ENTRY_NR 256
 
@@ -71,6 +71,18 @@ typedef struct _idt_desc {
 } PACKED idt_desc;
 
 uint16_t alloc_tss_desc(tss_t *tss_p);
+
+static inline seg_desc *get_gdt(void)
+{
+  extern uint64_t _kernel_gdt;
+  return (seg_desc *) &_kernel_gdt;
+}
+
+static inline idt_entry *get_idt(void)
+{
+  extern uint64_t _kernel_idt;
+  return (idt_entry *) (&_kernel_idt);
+}
 
 static inline void halt(void)
 {

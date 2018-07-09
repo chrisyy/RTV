@@ -22,7 +22,12 @@
 #include "vm.h"
 #include "apic.h"
 
-idt_entry idt64[IDT_ENTRY_NR] ALIGNED(PG_SIZE);
+typedef struct _hw_regs {
+  uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+  uint64_t rdi, rsi, rbp, rdx, rcx, rbx, rax;
+  uint32_t error_code;
+} PACKED hw_regs_t;
+
 idt_desc idtr;
 
 extern void *int_table[IDT_ENTRY_NR];
@@ -46,19 +51,50 @@ static inline void idt_set_entry(uint16_t index, uint8_t type, void *handler(), 
 void idt_init(void)
 {
   uint16_t i;
+  idt_entry *idt_ptr = get_idt();
+
   for (i = 0; i < IDT_ENTRY_NR; i++)
-    idt_set_entry(i, INTERRUPT_GATE_TYPE, int_table[i], idt64);
+    idt_set_entry(i, INTERRUPT_GATE_TYPE, int_table[i], idt_ptr);
 
   idtr.limit = IDT_ENTRY_NR * sizeof(idt_entry) - 1;
-  idtr.base = (uint64_t) idt64;
+  idtr.base = (uint64_t) idt_ptr;
 
   __asm__ volatile("lidt %0" : : "m" (idtr) : "memory");
 }
 
-void exp_handler(uint64_t irq, uint64_t *regs)
+void exp_handler(uint64_t irq, hw_regs_t *regs)
 {
-  printf("exception %u\n", irq);
-  while (1);
+  uint64_t cr0, cr2, cr3, cr4, cr8;
+
+  __asm__ volatile("movq %%cr0, %%rax\n"
+                   "movq %%rax, %0\n"
+                   "movq %%cr2, %%rax\n"
+                   "movq %%rax, %1\n"
+                   "movq %%cr3, %%rax\n"
+                   "movq %%rax, %2\n"
+                   "movq %%cr4, %%rax\n"
+                   "movq %%rax, %3\n"
+                   "movq %%cr8, %%rax\n"
+                   "movq %%rax, %4\n"
+                   : "=m" (cr0), "=m" (cr2), "=m" (cr3), 
+                   "=m" (cr4), "=m" (cr8));
+
+  printf("Exception %llu (error code %X):\n", irq, regs->error_code);
+  printf("CR0=%llX, CR2=%llX, CR3=%llX, CR4=%llX, CR8=%llX\n", 
+         cr0, cr2, cr3, cr4, cr8);
+  printf("RAX=%llX, RBX=%llX, RCX=%llX, RDX=%llX, RBP=%llX, " 
+         "RSI=%llX, RDI=%llX\n", regs->rax, regs->rbx, regs->rcx, 
+         regs->rdx, regs->rbp, regs->rsi, regs->rdi);
+  printf("R8=%llX, R9=%llX, R10=%llX, R11=%llX, R12=%llX, "
+         "R13=%llX, R14=%llX, R15=%llX\n", regs->r8, regs->r9, 
+         regs->r10, regs->r11, regs->r12, regs->r13, regs->r14, 
+         regs->r15);
+
+  if (irq == EXCEPTION_PG_FAULT) 
+    vm_check_mapping((uint64_t *) cr2);
+
+  while (1)
+    pause();
 }
 
 void isr_handler(uint64_t irq)

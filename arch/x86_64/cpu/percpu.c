@@ -25,14 +25,11 @@ uint8_t *percpu_virt[MAX_CPUS];
 
 static uint16_t pcpu_counter = 0;
 
-extern seg_desc gdt64[GDT_ENTRY_NR];
 extern void (*_percpu_ctors)();
 extern uint64_t _percpu_pages_plus_one;
 
 DEF_PER_CPU(uint16_t, pcpu_id);
 INIT_PER_CPU(pcpu_id) {
-  printf("%llx, %llx\n", &pcpu_id, &pcpu_counter);
-  //while(1);
   percpu_write(pcpu_id, pcpu_counter++);
 }
 
@@ -45,6 +42,7 @@ void percpu_init(void)
   /* legal range (inclusive): base -> base + limit */
   uint64_t limit;
   uint64_t start_frame;
+  seg_desc *gdt_ptr = get_gdt();
 
   /* 
    * workaround: GCC will eliminate this if-statement when the check
@@ -63,7 +61,7 @@ void percpu_init(void)
   limit = pages * PG_SIZE - 1;
 
   for (i = GDT_START; i < GDT_ENTRY_NR; i++) {
-    if (!gdt64[i].p)
+    if (!gdt_ptr[i].p)
       break;
   }
   if (i == GDT_ENTRY_NR) 
@@ -71,7 +69,7 @@ void percpu_init(void)
 
   start_frame = alloc_phys_frames(pages);
   if (start_frame == 0) 
-    panic(__func__, "out of physical RAM");
+    panic(__func__, "out of physical memory");
 
   uint64_t start_virt = (uint64_t) vm_map_pages(start_frame, pages, PGT_P | PGT_RW);
   if (start_virt == 0) 
@@ -93,14 +91,10 @@ void percpu_init(void)
     .g = 0
   };
 
-  memcpy(&gdt64[i], &seg, sizeof(seg_desc));
+  memcpy(&gdt_ptr[i], &seg, sizeof(seg_desc));
 
   i <<= 3;
   __asm__ volatile("movw %0, %%"PER_CPU_SEG_STR"\n" : : "r" (i));
-
-  uint16_t tmp = 0;
-  __asm__ volatile("movw %%fs, %0" : "=m" (tmp));
-  printf("fs: %u\n", tmp);
 
   /* invoke initialization functions */
   void (**ctor)();

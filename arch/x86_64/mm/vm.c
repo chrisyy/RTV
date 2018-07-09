@@ -18,26 +18,68 @@
 #include "vm.h"
 #include "mm/physical.h"
 #include "utils/bits.h"
+#include "utils/screen.h"
 #include "helper.h"
 
 #define VM_TABLE_ENTRIES (PG_SIZE / sizeof(uint64_t))
-
 #define VM_TABLE_MASK ((1 << (PG_BITS - 3)) - 1)
 
-uint64_t kernel_pgt[VM_TABLE_ENTRIES] ALIGNED(PG_SIZE);
+/* canonical address, level 0-3: pml4t to pt */
+static uint64_t *get_paging_struct_vaddr(uint64_t *addr, uint8_t level)
+{
+  uint64_t bits = (uint64_t) addr;
+
+  switch (level) {
+  case 0:
+    return (uint64_t *) 0xFFFFFFFFFFFFF000;
+
+  case 1:
+    return (uint64_t *) (((bits >> 27) | 0xFFFFFFFFFFE00000) & PGT_MASK);
+
+  case 2:
+    return (uint64_t *) (((bits >> 18) | 0xFFFFFFFFC0000000) & PGT_MASK);
+
+  case 3:
+    return (uint64_t *) (((bits >> 9) | 0xFFFFFF8000000000) & PGT_MASK);
+
+  default:
+    panic(__func__, "invalid paging level option");
+  }
+
+  return NULL;
+}
+
+void vm_check_mapping(uint64_t *addr)
+{
+  uint64_t *pml4t, *pdpt, *pdt, *pt;
+  uint64_t entry;
+
+  pml4t = get_paging_struct_vaddr(addr, 0);
+  entry = ((uint64_t) addr & 0xFF8000000000) >> 39;
+  printf("PML4T entry: %llX\n", pml4t[entry]);
+  pdpt = get_paging_struct_vaddr(addr, 1);
+  entry = ((uint64_t) addr & 0x7FC0000000) >> 30;
+  printf("PDPT entry: %llX\n", pdpt[entry]);
+  pdt = get_paging_struct_vaddr(addr, 2);
+  entry = ((uint64_t) addr & 0x3FE00000) >> 21;
+  printf("PDT entry: %llX\n", pdt[entry]);
+  pt = get_paging_struct_vaddr(addr, 3);
+  entry = ((uint64_t) addr & 0x1FF000) >> 12;
+  printf("PT entry: %llX\n", pt[entry]);
+}
 
 void *vm_map_page(uint64_t frame, uint64_t flags)
 {
   uint64_t i;
   void *va;
+  uint64_t *pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
 
   for (i = 0; i < VM_TABLE_ENTRIES; i++) {
-    if (!(kernel_pgt[i] & PGT_P)) {
-      kernel_pgt[i] = frame | flags;
+    if (!(pt[i] & PGT_P)) {
+      pt[i] = frame | flags;
       va = (void *) (KERNEL_MAPPING_BASE + (i << PG_BITS));
-
       return va;
-    } 
+    }
   }
     
   return NULL;
@@ -49,15 +91,16 @@ void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags)
   uint64_t i, j;
   void *va;
   uint64_t count = 0;
+  uint64_t *pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
 
   if (num < 1) return NULL;
 
   for (i = 0; i < VM_TABLE_ENTRIES - num + 1; i++) {
-    if (!(kernel_pgt[i] & PGT_P)) {
+    if (!(pt[i] & PGT_P)) {
       count++;
 
       for (j = i + 1; j < i + num; j++) {
-        if (!(kernel_pgt[j] & PGT_P))
+        if (!(pt[j] & PGT_P))
           count++;
         else
           break;
@@ -65,7 +108,7 @@ void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags)
 
       if (count == num) {
         for (j = i; j < i + num; j++) {
-          kernel_pgt[j] = frame | flags;
+          pt[j] = frame | flags;
           frame += PG_SIZE;
         }
 
@@ -83,21 +126,22 @@ void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags)
 
 void vm_unmap_page(void *va)
 {
+  uint64_t *pt = get_paging_struct_vaddr((uint64_t *) va, 3);
   uint64_t i = ((uint64_t) va) >> PG_BITS;
   i &= VM_TABLE_MASK;
-
-  kernel_pgt[i] = 0;
+  pt[i] = 0;
   invalidate_page(va);
 }
 
 void vm_unmap_pages(void *va, uint64_t num)
 {
+  uint64_t *pt = get_paging_struct_vaddr((uint64_t *) va, 3);
   uint8_t *pg = (uint8_t *) va;
   uint64_t i = ((uint64_t) va) >> PG_BITS;
   i &= VM_TABLE_MASK;
 
   while (num > 0) {
-    kernel_pgt[i] = 0;
+    pt[i] = 0;
     invalidate_page(pg);
 
     num--;
@@ -110,48 +154,36 @@ void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr)
 {
   uint64_t new;
   uint64_t entry;
-  uint64_t *pdpt, *pdt, *pt;
-  extern uint64_t pml4t[];
+  uint64_t *pml4t, *pdpt, *pdt, *pt;
   
+  pml4t = get_paging_struct_vaddr((uint64_t *) vaddr, 0);
   entry = (vaddr & 0xFF8000000000) >> 39;
   if ((pml4t[entry] & PGT_P) == 0) { 
     new = alloc_phys_frame();
     if (new == 0)
       panic(__func__, "page allocation for PDPT failed");
     pml4t[entry] = new | PGT_P | PGT_RW;
-    pdpt = (uint64_t *) vm_map_page(new, PGT_P | PGT_RW);
-  } else
-    pdpt = (uint64_t *) vm_map_page(pml4t[entry] & PGT_MASK, PGT_P | PGT_RW);
+  }
 
-  if (pdpt == NULL)
-      panic(__func__, "failed to map page");
-
+  pdpt = get_paging_struct_vaddr((uint64_t *) vaddr, 1);
   entry = (vaddr & 0x7FC0000000) >> 30;
   if ((pdpt[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
       panic(__func__, "page allocation for PDT failed");
     pdpt[entry] = new | PGT_P | PGT_RW;
-    pdt = (uint64_t *) vm_map_page(new, PGT_P | PGT_RW);
-  } else
-    pdt = (uint64_t *) vm_map_page(pdpt[entry] & PGT_MASK, PGT_P | PGT_RW);
+  }
 
-  if (pdt == NULL)
-    panic(__func__, "failed to map page");
-
+  pdt = get_paging_struct_vaddr((uint64_t *) vaddr, 2);
   entry = (vaddr & 0x3FE00000) >> 21;
   if ((pdt[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
       panic(__func__, "page allocation for PT failed");
     pdt[entry] = new | PGT_P | PGT_RW;
-    pt = (uint64_t *) vm_map_page(new, PGT_P | PGT_RW);
-  } else
-    pt = (uint64_t *) vm_map_page(pdt[entry] & PGT_MASK, PGT_P | PGT_RW);
+  }
 
-  if (pt == NULL)
-    panic(__func__, "failed to map page");
-    
+  pt = get_paging_struct_vaddr((uint64_t *) vaddr, 3);
   entry = (vaddr & 0x1FF000) >> 12;
   pt[entry] = frame | flags;
 }
@@ -160,23 +192,38 @@ void vm_init(void)
 {
   uint16_t i;
   uint64_t entry;
-  uint64_t *pdpt, *pdt;
-  extern uint64_t pml4t[];
+  uint64_t new;
+  uint64_t *pml4t, *pdpt, *pdt, *pt;
 
-  for (i = 0; i < VM_TABLE_ENTRIES; i++)
-    kernel_pgt[i] = 0;
-
-  /* set up 2MB virtual memory for kernel mapping */
+  /* set up 2MB virtual memory for dynamic kernel mapping */
+  pml4t = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 0);
   entry = (KERNEL_MAPPING_BASE & 0xFF8000000000) >> 39;
-  if ((pml4t[entry] & PGT_P) == 0) 
-    panic(__func__, "need to allocate page for PDPT");
-  pdpt = (uint64_t *) (pml4t[entry] & PGT_MASK);
+  if ((pml4t[entry] & PGT_P) == 0) { 
+    new = alloc_phys_frame();
+    if (new == 0)
+      panic(__func__, "page allocation for PDPT failed");
+    pml4t[entry] = new | PGT_P | PGT_RW;
+  }
 
+  pdpt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 1);
   entry = (KERNEL_MAPPING_BASE & 0x7FC0000000) >> 30;
-  if ((pdpt[entry] & PGT_P) == 0) 
-    panic(__func__, "need to allocate page for PDT");
-  pdt = (uint64_t *) (pdpt[entry] & PGT_MASK);
+  if ((pdpt[entry] & PGT_P) == 0) {
+    new = alloc_phys_frame();
+    if (new == 0)
+      panic(__func__, "page allocation for PDT failed");
+    pdpt[entry] = new | PGT_P | PGT_RW;
+  }
 
+  pdt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 2);
   entry = (KERNEL_MAPPING_BASE & 0x3FE00000) >> 21;
-  pdt[entry] = (uint64_t) kernel_pgt | PGT_P | PGT_RW;
+  if ((pdt[entry] & PGT_P) == 0) {
+    new = alloc_phys_frame();
+    if (new == 0)
+      panic(__func__, "page allocation for PT failed");
+    pdt[entry] = new | PGT_P | PGT_RW;
+  }
+
+  pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
+  for (i = 0; i < VM_TABLE_ENTRIES; i++) 
+    pt[i] = 0;
 }

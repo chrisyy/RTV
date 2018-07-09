@@ -43,9 +43,6 @@ void acpi_sec_init(void)
 {
   uint16_t i, count = 0;
 
-  if (g_cpus > 1)
-    memcpy((uint8_t *) SMP_BOOT_ADDR, ap_boot_start, ap_boot_end - ap_boot_start);
-
   for (i = 1; i < g_cpus; i++) {
     if (!smp_boot_cpu(lapic_ids[i])) {
       printf("%s: Failed to boot cpu %u\n", __func__, lapic_ids[i]);
@@ -127,14 +124,14 @@ static void acpi_parse_dt(acpi_header_t *header)
   //printf("%s 0x%x\n", sigstr, signature);
 
   /* "APIC" */
-  if (header->signature == 0x43495041) 
+  if (header->signature == 0x43495041)
     acpi_parse_apic((acpi_madt_t *) header);
 }
 
 static void acpi_parse_rsdt(uint32_t rsdt)
 {
   /* map two pages in case RSDT spans across page boundary */
-  uint32_t page_start = (rsdt >> PG_BITS) << PG_BITS;
+  uint32_t page_start = rsdt & PGT_MASK;
   uint8_t *va = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
   uint8_t *rsdt_p = va + rsdt - page_start;
   uint32_t *sdt = (uint32_t *) (rsdt_p + sizeof(acpi_header_t));
@@ -145,9 +142,9 @@ static void acpi_parse_rsdt(uint32_t rsdt)
 
   while (sdt < end) {
     uint64_t address = (uint64_t) *sdt++;
-    page_start = (address >> PG_BITS) << PG_BITS;
+    page_start = address & PGT_MASK;
     uint8_t *va2 = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
-    acpi_header_t *dt_p = (acpi_header_t *) (va2 + address - page_start); 
+    acpi_header_t *dt_p = (acpi_header_t *) (va2 + address - page_start);
     acpi_parse_dt(dt_p);
     vm_unmap_pages(va2, 2);
   }
@@ -158,7 +155,7 @@ static void acpi_parse_rsdt(uint32_t rsdt)
 static void acpi_parse_xsdt(uint64_t xsdt)
 {
   /* map two pages in case XSDT spans across page boundary */
-  uint64_t page_start = (xsdt >> PG_BITS) << PG_BITS;
+  uint64_t page_start = xsdt & PGT_MASK;
   uint8_t *va = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
   uint8_t *xsdt_p = va + xsdt - page_start;
   uint64_t *sdt = (uint64_t *) (xsdt_p + sizeof(acpi_header_t));
@@ -218,7 +215,7 @@ void acpi_init(void)
 {
   uint8_t *p, *end;
 
-  /* Search main BIOS area below 1MB */
+  /* Search main BIOS area below 1MB, identity mapping */
   p = (uint8_t *) 0x000e0000;
   end = (uint8_t *) 0x000fffff;
 
@@ -236,6 +233,9 @@ void acpi_init(void)
 
   if (p >= end)
     panic(__func__, "Can't find RSDP");
+
+  if (g_cpus > 1)
+    memcpy((uint8_t *) SMP_BOOT_ADDR, ap_boot_start, ap_boot_end - ap_boot_start);
 
   //TODO - Search Extended BIOS Data Area
 }

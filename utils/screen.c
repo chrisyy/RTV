@@ -25,11 +25,11 @@
 /*  The attribute of an character. */
 #define ATTRIBUTE               7
 
-/*  The video memory address. */
-uint8_t *frameBuf = (uint8_t *)0xB8000;
-/*  Save the X position. */
+/*  The video memory address */
+uint8_t *frameBuf = (uint8_t *) 0xB8000;
+/*  Save the X position */
 static uint16_t xpos;
-/*  Save the Y position. */
+/*  Save the Y position */
 static uint16_t ypos;
 
 static void _putchar(char c)
