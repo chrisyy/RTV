@@ -132,7 +132,7 @@ static void acpi_parse_rsdt(uint32_t rsdt)
 {
   /* map two pages in case RSDT spans across page boundary */
   uint32_t page_start = rsdt & PGT_MASK;
-  uint8_t *va = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
+  uint8_t *va = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P | PGT_XD);
   uint8_t *rsdt_p = va + rsdt - page_start;
   uint32_t *sdt = (uint32_t *) (rsdt_p + sizeof(acpi_header_t));
   uint32_t *end = (uint32_t *) (rsdt_p + ((acpi_header_t *) rsdt_p)->length);
@@ -143,7 +143,7 @@ static void acpi_parse_rsdt(uint32_t rsdt)
   while (sdt < end) {
     uint64_t address = (uint64_t) *sdt++;
     page_start = address & PGT_MASK;
-    uint8_t *va2 = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
+    uint8_t *va2 = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P | PGT_XD);
     acpi_header_t *dt_p = (acpi_header_t *) (va2 + address - page_start);
     acpi_parse_dt(dt_p);
     vm_unmap_pages(va2, 2);
@@ -156,7 +156,7 @@ static void acpi_parse_xsdt(uint64_t xsdt)
 {
   /* map two pages in case XSDT spans across page boundary */
   uint64_t page_start = xsdt & PGT_MASK;
-  uint8_t *va = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
+  uint8_t *va = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P | PGT_XD);
   uint8_t *xsdt_p = va + xsdt - page_start;
   uint64_t *sdt = (uint64_t *) (xsdt_p + sizeof(acpi_header_t));
   uint64_t *end = (uint64_t *) (xsdt_p + ((acpi_header_t *) xsdt_p)->length);
@@ -167,7 +167,7 @@ static void acpi_parse_xsdt(uint64_t xsdt)
   while (sdt < end) {
     uint64_t address = *sdt++;
     page_start = (address >> PG_BITS) << PG_BITS;
-    uint8_t *va2 = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P);
+    uint8_t *va2 = (uint8_t *) vm_map_pages((uint64_t) page_start, 2, PGT_P | PGT_XD);
     acpi_header_t *dt_p = (acpi_header_t *) (va2 + address - page_start);
     acpi_parse_dt(dt_p);
     vm_unmap_pages(va2, 2);

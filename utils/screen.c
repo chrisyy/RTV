@@ -224,6 +224,7 @@ directive_finished:
   }
 }
 
+/* only 'X'/'x' support 64 bit 'll' */
 void printf(const char *fmt, ...)
 {
   va_list args;

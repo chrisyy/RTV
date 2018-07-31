@@ -52,10 +52,10 @@ ap_stack_ptr:
   orl $0x30, %eax
   movl %eax, %cr4
 
-  /* set long mode */
+  /* enable long mode + execute disable */
   movl $IA32_EFER, %ecx
   rdmsr
-  orl $0x100, %eax
+  orl $0x900, %eax
   wrmsr
 
   /* enable paging, protected mode */

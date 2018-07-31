@@ -130,10 +130,11 @@ void lapic_init(void)
   if (cpu == 0) {
     /* identity mapping for LAPIC */
     vm_map_page_unrestricted((uint64_t) lapic_addr, 
-                             PGT_P | PGT_RW | PGT_PCD | PGT_PWT, 
+                             PGT_P | PGT_RW | PGT_PCD | PGT_PWT | PGT_XD, 
                              (uint64_t) lapic_addr);
 
     /* get timer frequency: (ebx/eax)*ecx */
+    //TODO: inaccurate freq
     cpuid(0x15, 0, &eax, &ebx, &ecx, NULL);
     if (ecx == 0 || ebx == 0)
       panic(__func__, "No TSC frequency info");
@@ -166,7 +167,7 @@ void ioapic_init(void)
 
   /* identity mapping for IOAPIC */
   vm_map_page_unrestricted((uint64_t) ioapic_addr, 
-                           PGT_P | PGT_RW | PGT_PCD | PGT_PWT, 
+                           PGT_P | PGT_RW | PGT_PCD | PGT_PWT | PGT_XD, 
                            (uint64_t) ioapic_addr);
 
   //printf("%s: %u\n", __func__, ioapic_read32(IOAPIC_VER));

@@ -39,7 +39,6 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   struct multiboot_tag *tag;
   uint16_t selector;
   uint64_t mem_end, mem_limit = 0;
-  uint64_t cr3;
   tss_t *tss_ptr;
 
   /* multiboot2 */
@@ -94,6 +93,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   interrupt_init();
 
+
   vm_init(); 
 
   percpu_init();
@@ -105,15 +105,13 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   ioapic_init();
 
   /* remap video memory */
-  frameBuf = (uint8_t *) vm_map_page((uint64_t) frameBuf, PGT_P | PGT_RW | PGT_PCD | PGT_PWT);
+  frameBuf = (uint8_t *) vm_map_page((uint64_t) frameBuf, PGT_P | PGT_RW | PGT_PCD | PGT_PWT | PGT_XD);
 
   acpi_sec_init();
 
   /* remove the first 2MB identity mapping (Recursive Mapping) */
   *((uint64_t *) 0xFFFFFFFFC0000000) = 0;
-
-  //__asm__ volatile("movq %%cr3, %0\n" : "=r" (cr3) : : "memory");
-  //__asm__ volatile("movq %0, %%cr3\n" : : "r" (cr3) : "memory");
+  tlb_flush();
 
   printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
 

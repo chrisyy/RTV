@@ -125,7 +125,7 @@ _start:
   stosl
   addl $0x1000, %eax
   movl %eax, %ebx
-  movl $0, %eax
+  movl $0x10000000, %eax  /* execute disable */
   stosl
   movl %ebx, %eax
   loop 1b
@@ -137,26 +137,28 @@ _start:
   stosl
   addl $0x1000, %eax
   movl %eax, %ebx
-  movl $0, %eax
+  movl $0x10000000, %eax
   stosl
   movl %ebx, %eax
   loop 1b
 
   /* map GDT */
-  movl $gdt64 + 3, %eax /* present+write bits */
+  movl $gdt64 + 3, %eax
   stosl
-  movl $0, %eax
+  movl $0x10000000, %eax
   stosl
 
   /* map IDT */
-  movl $idt64 + 3, %eax /* present+write bits */
+  movl $idt64 + 3, %eax
   stosl
-  movl $0, %eax
+  movl $0x10000000, %eax
   stosl
 
   /* set up Recursive Mapping in the last entry */
   movl $pml4t + 3, %eax
   movl %eax, pml4t + 4088
+  movl $0x10000000, %eax
+  movl %eax, pml4t + 4092
 
   /* install paging struct */
   movl $pml4t, %eax
@@ -167,10 +169,10 @@ _start:
   orl $0x30, %eax
   movl %eax, %cr4
 
-  /* set long mode */
+  /* enable long mode + execute disable */
   movl $IA32_EFER, %ecx
   rdmsr
-  orl $0x100, %eax
+  orl $0x900, %eax
   wrmsr
 
   /* enable paging */

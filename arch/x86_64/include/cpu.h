@@ -133,5 +133,35 @@ static inline void wrmsr(uint32_t ecx, uint64_t val)
   __asm__ volatile("wrmsr" : : "d" (edx), "a" (eax), "c" (ecx));
 }
 
+static inline void compiler_barrier(void)
+{
+  __asm__ volatile("" : : : "memory");
+}
+
+static inline void mem_barrier(void)
+{
+  __asm__ volatile("mfence" : : : "memory");
+}
+
+static inline void tlb_flush(void)
+{
+  uint64_t tmp;
+  __asm__ volatile("movq %%cr3, %0" : "=r" (tmp));
+  __asm__ volatile("movq %0, %%cr3" : : "r" (tmp));
+  mem_barrier();
+}
+
+static inline uint64_t rdtsc(void)
+{
+  uint32_t low, high;
+  uint64_t time;
+  __asm__ volatile("lfence\n"
+                   "rdtsc" : "=a" (low), "=d" (high) : : "memory");
+  time = high;
+  time <<= 32;
+  time |= low;
+  return time;
+}
+
 #endif /* __ASSEMBLER__ */
 #endif

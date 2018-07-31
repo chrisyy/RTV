@@ -17,6 +17,7 @@
 #define PGT_D   0x40
 #define PGT_PAT 0x80
 #define PGT_G   0x100
+#define PGT_XD  0x8000000000000000
 
 #define PGT_MASK ((uint64_t) 0xFFFFFFFFFFFFF000)
 

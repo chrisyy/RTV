@@ -99,10 +99,8 @@ void exp_handler(uint64_t irq, hw_regs_t *regs)
 
 void isr_handler(uint64_t irq)
 {
-  printf("interrupt %u\n", irq);
-  //TODO
-  //lapic_eoi();
-  while (1);
+  //printf("interrupt %u\n", irq);
+  lapic_eoi();
 }
 
 void pit_init(void)
@@ -111,8 +109,8 @@ void pit_init(void)
 
   //TODO: set to one-shot
   /* Set interval timer to interrupt once every 1/HZth second */
-  outb(PIT_CHANNEL0, (PIT_FREQ / HZ) & 0xFF);  /* channel 0 low byte */
-  outb(PIT_CHANNEL0, (PIT_FREQ / HZ) >> 8);    /* channel 0 high byte */
+  outb(PIT_CHANNEL0, (uint8_t) ((PIT_FREQ / HZ) & 0xFF));  /* channel 0 low byte */
+  outb(PIT_CHANNEL0, (uint8_t) ((PIT_FREQ / HZ) >> 8));    /* channel 0 high byte */
 }
 
 void pic_init(void)

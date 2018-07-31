@@ -48,7 +48,7 @@ bool smp_boot_cpu(uint8_t lapic)
   stack = alloc_phys_frame();
   if (stack == 0)
     panic(__func__, "running out of memory");
-  va = (uint8_t *) vm_map_page(stack, PGT_P | PGT_RW);
+  va = (uint8_t *) vm_map_page(stack, PGT_P | PGT_RW | PGT_XD);
   if (!va)
     panic(__func__, "running out of va mapping");
 
