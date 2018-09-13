@@ -40,6 +40,7 @@ config.mk:
 iso: 
 	mkdir -p $(ISO_DIR)/boot/grub
 	cp $(PROG) $(ISO_DIR)/boot/
+	cp boot.cfg $(ISO_DIR)/boot/
 	cp grub.cfg $(ISO_DIR)/boot/grub/
 	grub-mkrescue -o $(PROG).iso $(ISO_DIR)
 

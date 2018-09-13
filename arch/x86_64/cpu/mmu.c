@@ -16,7 +16,7 @@
  */
 
 #include "cpu.h"
-#include "helper.h"
+#include "debug.h"
 
 
 uint16_t alloc_tss_desc(tss_t *tss_p)

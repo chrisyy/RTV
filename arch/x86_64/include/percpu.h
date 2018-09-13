@@ -1,7 +1,7 @@
 #ifndef _PERCPU_H_
 #define _PERCPU_H_
 
-#include "helper.h"
+#include "debug.h"
 #include "cpu.h"
 
 #define PER_CPU_SEG_STR "fs"

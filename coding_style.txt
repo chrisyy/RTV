@@ -10,6 +10,8 @@ Comment:
  * ...
  */
 
+always explicitly initialize global variables
+
 data types:
 for string, use char;
 otherwise, be explicit with bit length (stdint types):

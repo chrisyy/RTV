@@ -18,7 +18,7 @@
 #include "acpi.h"
 #include "asm-string.h"
 #include "utils/screen.h"
-#include "helper.h"
+#include "debug.h"
 #include "vm.h"
 #include "percpu.h"
 #include "apic.h"

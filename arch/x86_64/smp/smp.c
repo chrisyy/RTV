@@ -17,7 +17,7 @@
 
 #include "smp.h"
 #include "mm/physical.h"
-#include "helper.h"
+#include "debug.h"
 #include "apic.h"
 #include "percpu.h"
 
@@ -97,6 +97,8 @@ void ap_main(void)
   tss_ptr->rsp[0] = stack;
   selector = alloc_tss_desc(tss_ptr);
   load_tr(selector);
+
+  //interrupt_enable();
 
   while(1);
 }

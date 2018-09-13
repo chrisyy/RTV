@@ -1,3 +1,4 @@
-acpi code from https://github.com/pdoane/osdev/
-
-lapic code from quest
+acpi from https://github.com/pdoane/osdev/
+malloc modified from https://github.com/laprej/buddy-allocator
+list.h from linux /include/linux/list.h
+lapic, percpu from quest

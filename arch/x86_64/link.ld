@@ -34,10 +34,10 @@ SECTIONS
   } 
 
   _kernel_start_pa = ALIGN(4K);
-  /* boot pages can't exceed 1MB, identity mapped the first 2MB */
+  ASSERT(_kernel_start_pa <= 2M, 
+         "Boot pages can't exceed 1MB, identity mapped the first 2MB")
   _boot_pages = (_kernel_start_pa - _boot_start) / 0x1000;
 
-  /* kernel pages can't exceed 4MB - 8KB, last 2 pages for GDT/IDT mapping */
   _kernel_start_va = 2M;
   . = _kernel_start_va;
 
@@ -83,6 +83,9 @@ SECTIONS
   _kernel_code_pages = (_percpu_ctors_end - _text) / 0x1000;
   _kernel_ro_pages = (_rodata_end - _rodata) / 0x1000;
   _kernel_rw_pages = (_bss_end - _data) / 0x1000;
+
+  ASSERT(_bss_end <= 6M - 8K, 
+         "Kernel pages can't exceed 4MB - 8KB, last 2 pages for GDT/IDT mapping")
 
   .eh_frame (NOLOAD) : AT(LOADADDR(.bss) + _bss_end - _bss) ALIGN(4K)
   {

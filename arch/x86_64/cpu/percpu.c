@@ -18,7 +18,6 @@
 #include "cpu.h"
 #include "percpu.h"
 #include "mm/physical.h"
-#include "helper.h"
 #include "asm-string.h"
 
 uint8_t *percpu_virt[MAX_CPUS];

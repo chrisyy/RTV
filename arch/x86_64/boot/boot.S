@@ -17,9 +17,7 @@
 
 #include "msr.h"
 #include "cpu.h"
-
-  .set MAGIC, 0xE85250D6
-  .set ARCH, 0x0
+#include "multiboot2.h"
 
   .section .bss
   .align 0x1000
@@ -28,6 +26,7 @@
   .comm pdpt, 0x1000
   .comm pdt, 0x1000
   .comm kernel_page_tables, 0x2000
+  .comm new_multiboot, 0x1000
 
 tmp_stack:
   .skip 0x1000
@@ -64,12 +63,12 @@ msg_len:
   .section .multiboot
 header_start:
   .align 8
-  .long MAGIC
-  .long ARCH
+  .long MULTIBOOT2_HEADER_MAGIC
+  .long MULTIBOOT_ARCHITECTURE_I386
   .long header_end - header_start
-  .long -(MAGIC + ARCH + header_end - header_start)
+  .long -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + header_end - header_start)
   /* ending tag */
-  .short 0
+  .short MULTIBOOT_HEADER_TAG_END
   .short 0
   .long 0x8
 header_end:
@@ -81,7 +80,13 @@ header_end:
 _start:
   movl $stack_top, %esp
   pushl %eax  /* multiboot_magic */
-  pushl %ebx  /* multiboot_info */
+
+  /* relocate multiboot_info from ebx */
+  cld
+  movl (%ebx), %ecx
+  movl %ebx, %esi
+  movl $new_multiboot, %edi
+  rep movsb
 
   /* disable paging */
   movl %cr0, %eax
@@ -183,7 +188,7 @@ _start:
   lgdt gdt_ptr
 
   /* switch to stack with virtual address */
-  popl %ebx
+  movl $new_multiboot, %ebx
   popl %eax
   movl $kernel_stack + 0x1000, %esp
   pushl %eax

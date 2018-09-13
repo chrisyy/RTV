@@ -26,13 +26,17 @@
 #include "percpu.h"
 #include "smp.h"
 #include "utils/spinlock.h"
+#include "utils/string.h"
+#include "vmx.h"
+#include "boot_info.h"
+#include "mm/malloc.h"
 
-uint8_t kernel_stack[PG_SIZE];
+uint8_t kernel_stack[PG_SIZE] ALIGNED(PG_SIZE);
+boot_info_t vm_config = {.config_size = 0};
 
 extern uint64_t _boot_start, _boot_pages; 
 extern uint64_t _kernel_code_pages, _kernel_ro_pages, _kernel_rw_pages;
 extern uint8_t ap_boot_start[], ap_boot_end[];
-
 
 void kernel_main(uint64_t magic, uint64_t mbi)
 {
@@ -40,21 +44,29 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   uint16_t selector;
   uint64_t mem_end, mem_limit = 0;
   tss_t *tss_ptr;
+  uint32_t i;
+  uint64_t base, tmp, end;
+  uint8_t *config;
 
   /* multiboot2 */
   if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
-    printf("Invalid magic number: %X\n", (uint32_t)magic);
+    printf("Invalid magic number: %X\n", (uint32_t) magic);
+    return;
+  }
+  if (*(uint32_t *) mbi > PG_SIZE) {
+    printf("Multiboot struct is too big: %u\n", *(uint32_t *) mbi);
     return;
   }
 
   for (tag = (struct multiboot_tag *) (mbi + 8); 
        tag->type != MULTIBOOT_TAG_TYPE_END;
        tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
-                                            + ((tag->size + 7) & ~7))) {
+             + ((tag->size + 7) & ~7))) {
     switch(tag->type) {
     case MULTIBOOT_TAG_TYPE_CMDLINE:
       //printf("CMD: %s\n", ((struct multiboot_tag_string *) tag)->string);
       break;
+
     case MULTIBOOT_TAG_TYPE_MMAP: {
       multiboot_memory_map_t *mmap;
     
@@ -74,25 +86,50 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
       break;
     }
+
     case MULTIBOOT_TAG_TYPE_FRAMEBUFFER: {
       struct multiboot_tag_framebuffer *tagfb
         = (struct multiboot_tag_framebuffer *) tag;
       frameBuf = (uint8_t *) tagfb->common.framebuffer_addr;
       break;
     }
+    
     }
   }
 
   //TODO: check if SMP_BOOT_ADDR is free memory
 
+  physical_set_limit(mem_limit);
+  /* mark kernel image */
   physical_take_range((uint64_t) &_boot_start, ((uint64_t) &_boot_pages
                       + (uint64_t) &_kernel_code_pages
                       + (uint64_t) &_kernel_ro_pages
                       + (uint64_t) &_kernel_rw_pages) * PG_SIZE);
-  physical_set_limit(mem_limit);
+  /* mark mbi memory */
+  physical_take_range(mbi, *(uint32_t *) mbi);
+
+  /* mark modules */
+  for (tag = (struct multiboot_tag *) (mbi + 8); 
+       tag->type != MULTIBOOT_TAG_TYPE_END;
+       tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
+             + ((tag->size + 7) & ~7))) {
+    if (tag->type == MULTIBOOT_TAG_TYPE_MODULE) {
+      struct multiboot_tag_module *mod = (struct multiboot_tag_module *) tag;
+
+      if (!strncmp(mod->cmdline, "config", sizeof("config"))) {
+        vm_config.config_paddr = mod->mod_start;
+        vm_config.config_size = mod->mod_end - mod->mod_start;
+      } else
+        vm_config.num_mod++;
+
+      physical_take_range(mod->mod_start, mod->mod_end - mod->mod_start);
+    }
+  }
+
+  if (vm_config.config_size == 0)
+    panic(__func__, "Missing config module");
 
   interrupt_init();
-
 
   vm_init(); 
 
@@ -113,12 +150,26 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   *((uint64_t *) 0xFFFFFFFFC0000000) = 0;
   tlb_flush();
 
-  printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
-
+  malloc_init();
+  
   tss_ptr = percpu_pointer(get_pcpu_id(), cpu_tss);
   tss_ptr->rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
   selector = alloc_tss_desc(tss_ptr);
   load_tr(selector);
+
+  /* parse config file */
+  base = vm_config.config_paddr & PG_MASK;
+  end = vm_config.config_paddr + vm_config.config_size;
+  tmp = base;
+  for (i = 0; tmp < end; i++) 
+    tmp += PG_SIZE;
+  config = (uint8_t *) vm_map_pages(base, i, PGT_P | PGT_XD);
+  if (config == NULL)
+    panic(__func__, "Failed to map config module");
+  config += vm_config.config_paddr - base;
+  parse_boot_info(config, &vm_config);
+
+  printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
 
   interrupt_enable();
 

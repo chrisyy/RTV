@@ -18,7 +18,7 @@
 #include "mm/physical.h"
 #include "utils/bits.h"
 
-static uint64_t mm_table[MM_TABLE_MAX] ALIGNED(PG_SIZE);
+static uint64_t mm_table[MM_TABLE_MAX] ALIGNED(PG_SIZE) = {0};
 static uint64_t mm_limit = 0, entry_end = 0;
 
 void physical_free_range(uint64_t begin, uint64_t length)
@@ -118,6 +118,44 @@ uint64_t alloc_phys_frames(uint64_t num)
       if (count == num) {
         bitmap64_clear_range(mm_table, pos, num);
         return pos * PG_SIZE;
+      }
+
+      pos = cur + 1;
+      i = pos >> 6;
+    } else {
+      i++;
+      pos += 64;
+    }
+  }
+
+  return 0;
+}
+
+/* allocate contiguous page frames, starting address aligned */
+uint64_t alloc_phys_frames_aligned(uint64_t num, uint64_t align)
+{
+  uint64_t i, pos, count;
+
+  /* skip the first 1MB */
+  for (i = 4, pos = 256; i < entry_end; ) {
+    if (mm_table[i]) {
+      uint64_t cur;
+
+      while (bitmap64_get(mm_table, pos) == 0)
+        pos++;
+      
+      cur = pos;
+      if ((cur * PG_SIZE) % align == 0) {
+        count = 0;
+        while (count < num && bitmap64_get(mm_table, cur)) {
+          cur++;
+          count++;
+        }
+
+        if (count == num) {
+          bitmap64_clear_range(mm_table, pos, num);
+          return pos * PG_SIZE;
+        }
       }
 
       pos = cur + 1;
