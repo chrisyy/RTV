@@ -20,6 +20,7 @@
 #include "debug.h"
 #include "apic.h"
 #include "percpu.h"
+#include "cpu.h"
 
 extern uint8_t status_code[], ap_stack_ptr[];
 extern uint8_t ap_boot_start[];
@@ -84,7 +85,10 @@ void ap_main(void)
   uint64_t stack;
   uint16_t selector;
 
+  /* needs synchronization */
   percpu_init();
+
+  BOOT_STATUS() = 1;
 
   lapic_init();
 
@@ -97,6 +101,10 @@ void ap_main(void)
   tss_ptr->rsp[0] = stack;
   selector = alloc_tss_desc(tss_ptr);
   load_tr(selector);
+
+  /* remove the first 2MB identity mapping (Recursive Mapping) */
+  *((uint64_t *) 0xFFFFFFFFC0000000) = 0;
+  tlb_flush();
 
   //interrupt_enable();
 

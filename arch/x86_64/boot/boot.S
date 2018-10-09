@@ -21,12 +21,17 @@
 
   .section .bss
   .align 0x1000
-
-  .comm pml4t, 0x1000
-  .comm pdpt, 0x1000
-  .comm pdt, 0x1000
-  .comm kernel_page_tables, 0x2000
-  .comm new_multiboot, 0x1000
+  .global pml4t
+pml4t:
+  .skip 0x1000
+pdpt:
+  .skip 0x1000
+pdt:
+  .skip 0x1000
+kernel_page_tables:
+  .skip 0x2000
+new_multiboot:
+  .skip 0x1000
 
 tmp_stack:
   .skip 0x1000

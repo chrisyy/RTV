@@ -82,9 +82,6 @@ ap_boot64:
   movq $ap_stack_ptr - ap_boot_start + SMP_BOOT_ADDR, %rax
   movq (%rax), %rsp
 
-  movq $status_code - ap_boot_start + SMP_BOOT_ADDR, %rax
-  movq $1, (%rax)
-
   pushq $0  /* end of stack trace */
   mov $ap_main, %rax
   call *%rax

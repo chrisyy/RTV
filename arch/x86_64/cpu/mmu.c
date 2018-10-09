@@ -17,13 +17,16 @@
 
 #include "cpu.h"
 #include "debug.h"
+#include "utils/spinlock.h"
 
+spinlock_t gdt_lock = {.data = 0};
 
 uint16_t alloc_tss_desc(tss_t *tss_p)
 {
   uint16_t i;
   uint32_t limit = sizeof(tss_t) - 1;
   seg_desc *gdt_ptr = get_gdt();
+  spin_lock(&gdt_lock);
 
   /* TSS desc takes 16B */
   for (i = GDT_START; i < GDT_ENTRY_NR - 1; i++) {
@@ -45,10 +48,12 @@ uint16_t alloc_tss_desc(tss_t *tss_p)
 
       /* mark the second 8B used */
       gdt_ptr[i + 1].p = 1;
+      spin_unlock(&gdt_lock);
       return i << 3;
     }
   }
 
+  spin_unlock(&gdt_lock);
   panic(__func__, "out of GDT entries");
   return 0;
 }

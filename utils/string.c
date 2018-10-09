@@ -17,6 +17,14 @@
 
 #include "utils/string.h"
 
+uint64_t strlen(const char *str)
+{
+  uint64_t len = 0;
+  while (str[len] != '\0')
+    len++;
+  return len;
+}
+
 int strncmp(const char *s1, const char *s2, uint64_t n)
 {
   unsigned char c1 = 0, c2 = 0;

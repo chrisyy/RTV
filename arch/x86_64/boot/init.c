@@ -25,7 +25,6 @@
 #include "mm/physical.h"
 #include "percpu.h"
 #include "smp.h"
-#include "utils/spinlock.h"
 #include "utils/string.h"
 #include "vmx.h"
 #include "boot_info.h"
@@ -63,10 +62,6 @@ void kernel_main(uint64_t magic, uint64_t mbi)
        tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
              + ((tag->size + 7) & ~7))) {
     switch(tag->type) {
-    case MULTIBOOT_TAG_TYPE_CMDLINE:
-      //printf("CMD: %s\n", ((struct multiboot_tag_string *) tag)->string);
-      break;
-
     case MULTIBOOT_TAG_TYPE_MMAP: {
       multiboot_memory_map_t *mmap;
     
@@ -93,7 +88,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
       frameBuf = (uint8_t *) tagfb->common.framebuffer_addr;
       break;
     }
-    
+
     }
   }
 
@@ -105,8 +100,6 @@ void kernel_main(uint64_t magic, uint64_t mbi)
                       + (uint64_t) &_kernel_code_pages
                       + (uint64_t) &_kernel_ro_pages
                       + (uint64_t) &_kernel_rw_pages) * PG_SIZE);
-  /* mark mbi memory */
-  physical_take_range(mbi, *(uint32_t *) mbi);
 
   /* mark modules */
   for (tag = (struct multiboot_tag *) (mbi + 8); 
@@ -144,18 +137,12 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   /* remap video memory */
   frameBuf = (uint8_t *) vm_map_page((uint64_t) frameBuf, PGT_P | PGT_RW | PGT_PCD | PGT_PWT | PGT_XD);
 
-  acpi_sec_init();
-
-  /* remove the first 2MB identity mapping (Recursive Mapping) */
-  *((uint64_t *) 0xFFFFFFFFC0000000) = 0;
-  tlb_flush();
-
-  malloc_init();
-  
   tss_ptr = percpu_pointer(get_pcpu_id(), cpu_tss);
   tss_ptr->rsp[0] = ((uint64_t) kernel_stack) + PG_SIZE;
   selector = alloc_tss_desc(tss_ptr);
   load_tr(selector);
+
+  malloc_init();
 
   /* parse config file */
   base = vm_config.config_paddr & PG_MASK;
@@ -167,7 +154,40 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   if (config == NULL)
     panic(__func__, "Failed to map config module");
   config += vm_config.config_paddr - base;
+
+  if (vm_config.num_mod == 0)
+    panic(__func__, "Missing VM images");
+
   parse_boot_info(config, &vm_config);
+
+  /* access mbi before removing identity mapping */
+  for (tag = (struct multiboot_tag *) (mbi + 8); 
+       tag->type != MULTIBOOT_TAG_TYPE_END;
+       tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
+             + ((tag->size + 7) & ~7))) {
+    if (tag->type == MULTIBOOT_TAG_TYPE_MODULE) {
+      struct multiboot_tag_module *mod = (struct multiboot_tag_module *) tag;
+      uint16_t mod_index;
+      for (mod_index = 0; mod_index < vm_config.num_mod; mod_index++) {
+        if (strncmp(vm_config.mod_str[mod_index], mod->cmdline, 
+            BOOT_STRING_MAX) == 0) {
+          vm_config.mod_paddr[mod_index] = mod->mod_start;
+          vm_config.mod_size[mod_index] = mod->mod_end - mod->mod_start;
+          printf("mod %u: %llX %llX\n", mod_index, vm_config.mod_paddr[mod_index], vm_config.mod_size[mod_index]);
+        }
+      }
+    }
+  }
+
+  /* need synchronization after this */
+  acpi_sec_init();
+
+  /* assign cores to VMs */
+
+  
+  /* remove the first 2MB identity mapping (Recursive Mapping) */
+  *((uint64_t *) 0xFFFFFFFFC0000000) = 0;
+  tlb_flush();
 
   printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
 
