@@ -82,7 +82,7 @@ static inline void ioapic_write64(uint8_t reg, uint64_t data)
 void ioapic_map_gsi(uint32_t gsi, uint8_t vector, uint64_t flags)
 {
   if (gsi < gsi_base || gsi >= (gsi_base + num_gsi))
-    panic(__func__, "Unsupported GSI number");
+    panic("Unsupported GSI number");
 
   gsi -= gsi_base;
   ioapic_write64(IOAPIC_REDTBL(gsi), flags | vector);
@@ -137,7 +137,7 @@ void lapic_init(void)
     //TODO: inaccurate freq
     cpuid(0x15, 0, &eax, &ebx, &ecx, NULL);
     if (ecx == 0 || ebx == 0)
-      panic(__func__, "No TSC frequency info");
+      panic("No TSC frequency info");
     tsc_freq = (ecx * ebx) / eax;
     printf("TSC freq: %u\n", tsc_freq);
   }

@@ -18,7 +18,7 @@
 #include "cpu.h"
 #include "percpu.h"
 #include "mm/physical.h"
-#include "asm-string.h"
+#include "asm_string.h"
 
 uint8_t *percpu_virt[MAX_CPUS];
 
@@ -64,15 +64,15 @@ void percpu_init(void)
       break;
   }
   if (i == GDT_ENTRY_NR) 
-    panic(__func__, "out of GDT entries");
+    panic("out of GDT entries");
 
   start_frame = alloc_phys_frames(pages);
   if (start_frame == 0) 
-    panic(__func__, "out of physical memory");
+    panic("out of physical memory");
 
   uint64_t start_virt = (uint64_t) vm_map_pages(start_frame, pages, PGT_P | PGT_RW | PGT_XD);
   if (start_virt == 0) 
-    panic(__func__, "out of virtual addresses");
+    panic("out of virtual addresses");
   percpu_virt[pcpu_counter] = (uint8_t *) start_virt;
 
   seg_desc seg = {

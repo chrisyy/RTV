@@ -26,12 +26,14 @@
 #include "percpu.h"
 #include "smp.h"
 #include "utils/string.h"
-#include "vmx.h"
+#include "virt/virt.h"
 #include "boot_info.h"
 #include "mm/malloc.h"
+#include "utils/spinlock.h"
 
 uint8_t kernel_stack[PG_SIZE] ALIGNED(PG_SIZE);
 boot_info_t vm_config = {.config_size = 0};
+spinlock_t boot_lock = SPINLOCK_UNLOCKED;
 
 extern uint64_t _boot_start, _boot_pages; 
 extern uint64_t _kernel_code_pages, _kernel_ro_pages, _kernel_rw_pages;
@@ -120,7 +122,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   }
 
   if (vm_config.config_size == 0)
-    panic(__func__, "Missing config module");
+    panic("Missing config module");
 
   interrupt_init();
 
@@ -152,11 +154,11 @@ void kernel_main(uint64_t magic, uint64_t mbi)
     tmp += PG_SIZE;
   config = (uint8_t *) vm_map_pages(base, i, PGT_P | PGT_XD);
   if (config == NULL)
-    panic(__func__, "Failed to map config module");
+    panic("Failed to map config module");
   config += vm_config.config_paddr - base;
 
   if (vm_config.num_mod == 0)
-    panic(__func__, "Missing VM images");
+    panic("Missing VM images");
 
   parse_boot_info(config, &vm_config);
 
@@ -182,13 +184,17 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   /* need synchronization after this */
   acpi_sec_init();
 
-  /* assign cores to VMs */
-
-  
   /* remove the first 2MB identity mapping (Recursive Mapping) */
   *((uint64_t *) 0xFFFFFFFFC0000000) = 0;
   tlb_flush();
 
+  /* TODO assign cores to VMs */
+  spin_lock(&boot_lock);
+
+  virt_init(&vm_config);
+
+  spin_unlock(&boot_lock);
+  
   printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
 
   interrupt_enable();

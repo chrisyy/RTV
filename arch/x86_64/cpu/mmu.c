@@ -19,7 +19,7 @@
 #include "debug.h"
 #include "utils/spinlock.h"
 
-spinlock_t gdt_lock = {.data = 0};
+spinlock_t gdt_lock = SPINLOCK_UNLOCKED;
 
 uint16_t alloc_tss_desc(tss_t *tss_p)
 {
@@ -54,6 +54,6 @@ uint16_t alloc_tss_desc(tss_t *tss_p)
   }
 
   spin_unlock(&gdt_lock);
-  panic(__func__, "out of GDT entries");
+  panic("out of GDT entries");
   return 0;
 }

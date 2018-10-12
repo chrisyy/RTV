@@ -214,7 +214,7 @@ void *malloc(uint32_t size)
     while (bsystem[entry].count == 0) {
       entry++;
       if (entry >= BUDDY_ENTRIES) 
-        panic(__func__, "out of memory");
+        panic("out of memory");
       split_count++;
     }
 
@@ -246,7 +246,7 @@ void malloc_init(void)
   uint8_t list_count = BUDDY_MAX_ORDER - BUDDY_MIN_ORDER + 1;
 
   if ((1 << BUDDY_MIN_ORDER) < sizeof(buddy_list_t) + 1)
-    panic(__func__, "minimum block size too large");
+    panic("minimum block size too large");
 
   for (i = 0; i < list_count; i++) {
     bsystem[i].count = 0;
@@ -261,7 +261,7 @@ void malloc_init(void)
   if (size < LARGE_PG_SIZE) {
     paddr = alloc_phys_frames(pages);
     if (paddr == 0)
-      panic(__func__, "out of physical memory");
+      panic("out of physical memory");
     for (i = 0; i < pages; i++) {
       vm_map_page_unrestricted(paddr, PGT_P | PGT_RW | PGT_XD, vaddr);
       vaddr += PG_SIZE;
@@ -270,7 +270,7 @@ void malloc_init(void)
   } else {
     paddr = alloc_phys_frames_aligned(pages, LARGE_PG_SIZE);
     if (paddr == 0)
-      panic(__func__, "out of physical memory");
+      panic("out of physical memory");
     pages = 1 << (BUDDY_MAX_ORDER - LARGE_PG_BITS);
     for (i = 0; i < pages; i++) {
       vm_map_large_page_unrestricted(paddr, PDT_P | PDT_RW | PDT_XD | PDT_PS, vaddr);

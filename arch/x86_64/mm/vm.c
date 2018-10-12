@@ -20,7 +20,7 @@
 #include "utils/bits.h"
 #include "utils/screen.h"
 #include "debug.h"
-#include "asm-string.h"
+#include "asm_string.h"
 
 #define VM_TABLE_ENTRIES (PG_SIZE / sizeof(uint64_t))
 #define VM_TABLE_MASK ((1 << (PG_BITS - 3)) - 1)
@@ -44,7 +44,7 @@ static uint64_t *get_paging_struct_vaddr(uint64_t *addr, uint8_t level)
     return (uint64_t *) (((bits >> 9) | 0xFFFFFF8000000000) & PGT_MASK);
 
   default:
-    panic(__func__, "invalid paging level option");
+    panic("invalid paging level option");
   }
 
   return NULL;
@@ -185,7 +185,7 @@ void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr)
   if ((pml4t[entry] & PGT_P) == 0) { 
     new = alloc_phys_frame();
     if (new == 0)
-      panic(__func__, "page allocation for PDPT failed");
+      panic("page allocation for PDPT failed");
     pml4t[entry] = new | PGT_P | PGT_RW;
   }
 
@@ -194,7 +194,7 @@ void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr)
   if ((pdpt[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
-      panic(__func__, "page allocation for PDT failed");
+      panic("page allocation for PDT failed");
     pdpt[entry] = new | PGT_P | PGT_RW;
   }
 
@@ -203,14 +203,14 @@ void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr)
   if ((pdt[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
-      panic(__func__, "page allocation for PT failed");
+      panic("page allocation for PT failed");
     pdt[entry] = new | PGT_P | PGT_RW;
   }
 
   pt = get_paging_struct_vaddr((uint64_t *) vaddr, 3);
   entry = (vaddr & 0x1FF000) >> 12;
   if (pt[entry] & PGT_P)
-    panic(__func__, "page table entry not available");
+    panic("page table entry not available");
   pt[entry] = frame | flags;
 }
 
@@ -229,7 +229,7 @@ void vm_map_large_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vad
   if ((pml4t[entry] & PGT_P) == 0) { 
     new = alloc_phys_frame();
     if (new == 0)
-      panic(__func__, "page allocation for PDPT failed");
+      panic("page allocation for PDPT failed");
     pml4t[entry] = new | PGT_P | PGT_RW;
   }
 
@@ -238,14 +238,14 @@ void vm_map_large_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vad
   if ((pdpt[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
-      panic(__func__, "page allocation for PDT failed");
+      panic("page allocation for PDT failed");
     pdpt[entry] = new | PGT_P | PGT_RW;
   }
 
   pdt = get_paging_struct_vaddr((uint64_t *) vaddr, 2);
   entry = (vaddr & 0x3FE00000) >> 21;
   if (pdt[entry] & PGT_P)
-    panic(__func__, "page table entry not available");
+    panic("page table entry not available");
   pdt[entry] = frame | flags;
 }
 
@@ -262,7 +262,7 @@ void vm_init(void)
   if ((pml4t[entry] & PGT_P) == 0) { 
     new = alloc_phys_frame();
     if (new == 0)
-      panic(__func__, "page allocation for PDPT failed");
+      panic("page allocation for PDPT failed");
     pml4t[entry] = new | PGT_P | PGT_RW;
   }
 
@@ -271,7 +271,7 @@ void vm_init(void)
   if ((pdpt[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
-      panic(__func__, "page allocation for PDT failed");
+      panic("page allocation for PDT failed");
     pdpt[entry] = new | PGT_P | PGT_RW;
   }
 
@@ -280,7 +280,7 @@ void vm_init(void)
   if ((pdt[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
-      panic(__func__, "page allocation for PT failed");
+      panic("page allocation for PT failed");
     pdt[entry] = new | PGT_P | PGT_RW;
   }
 

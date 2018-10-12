@@ -38,7 +38,7 @@
                        : "+m" (var) : "ri" (val));      \
       break;                                            \
     default:                                            \
-      panic(__func__, "percpu_op_dest: bad size");      \
+      panic("percpu_op_dest: bad size");      \
     }                                                   \
   } while (0)
 
@@ -67,7 +67,7 @@
                        : "m" (var));                    \
       break;                                            \
     default:                                            \
-      panic(__func__, "percpu_op_src: bad size");       \
+      panic("percpu_op_src: bad size");       \
     }                                                   \
     _percpu_ret_;                                       \
   }) 

@@ -14,6 +14,8 @@ typedef union _spinlock {
   } obj;
 } spinlock_t;
 
+#define SPINLOCK_UNLOCKED {.data = 0}
+
 static inline void spin_lock_init(spinlock_t *lock)
 {
   atomic_store(&lock->data, 0);
@@ -28,7 +30,7 @@ static inline void spin_lock(spinlock_t *lock)
 
 static inline void spin_unlock(spinlock_t *lock)
 {
-  atomic_increment(&lock->obj.next);
+  atomic_increment(&lock->obj.owner);
 }
 
 /* return true if acquired lock */

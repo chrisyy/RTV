@@ -18,9 +18,8 @@
 #include "interrupt.h"
 #include "cpu.h"
 #include "utils/screen.h"
-#include "debug.h"
 
-void panic(const char *func, const char *msg)
+void panic_raw(const char *func, const char *msg)
 {
   interrupt_disable();
   printf("%s: %s\n", func, msg);

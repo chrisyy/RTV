@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-#define BOOT_STRING_MAX 100
+#define BOOT_STRING_MAX 32
 
 typedef struct _boot_info_t {
   uint64_t config_paddr;

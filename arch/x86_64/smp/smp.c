@@ -21,9 +21,11 @@
 #include "apic.h"
 #include "percpu.h"
 #include "cpu.h"
+#include "utils/spinlock.h"
 
 extern uint8_t status_code[], ap_stack_ptr[];
 extern uint8_t ap_boot_start[];
+extern spinlock_t boot_lock;
 
 #define BOOT_STATUS() \
 (*((volatile uint64_t *) (SMP_BOOT_ADDR + status_code - ap_boot_start)))
@@ -48,10 +50,10 @@ bool smp_boot_cpu(uint8_t lapic)
   
   stack = alloc_phys_frame();
   if (stack == 0)
-    panic(__func__, "running out of memory");
+    panic("running out of memory");
   va = (uint8_t *) vm_map_page(stack, PGT_P | PGT_RW | PGT_XD);
   if (!va)
-    panic(__func__, "running out of va mapping");
+    panic("running out of va mapping");
 
   /* status code is reset to 0 */
   BOOT_STATUS() = 0;
@@ -85,7 +87,7 @@ void ap_main(void)
   uint64_t stack;
   uint16_t selector;
 
-  /* needs synchronization */
+  /* needs synchronization, so before setting boot status */
   percpu_init();
 
   BOOT_STATUS() = 1;
@@ -102,9 +104,11 @@ void ap_main(void)
   selector = alloc_tss_desc(tss_ptr);
   load_tr(selector);
 
-  /* remove the first 2MB identity mapping (Recursive Mapping) */
-  *((uint64_t *) 0xFFFFFFFFC0000000) = 0;
-  tlb_flush();
+  spin_lock(&boot_lock);
+
+
+
+  spin_unlock(&boot_lock);
 
   //interrupt_enable();
 

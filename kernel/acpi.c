@@ -16,7 +16,7 @@
  */
 
 #include "acpi.h"
-#include "asm-string.h"
+#include "asm_string.h"
 #include "utils/screen.h"
 #include "debug.h"
 #include "vm.h"
@@ -63,7 +63,7 @@ static bool acpi_add_cpu(apic_lapic_t *info)
 
   lapic_ids[g_cpus++] = info->apic_id;
   if (g_cpus > MAX_CPUS)
-    panic(__func__, "Exceeds supported max CPUs");
+    panic("Exceeds supported max CPUs");
 
   return true;
 }
@@ -95,18 +95,18 @@ static void acpi_parse_apic(acpi_madt_t *madt)
       gsi_base = s->gsi_base;
       num_ioapic++;
       if (num_ioapic > 1)
-        panic(__func__, "Multiple IOAPIC not supported");
+        panic("Multiple IOAPIC not supported");
       //printf("Found I/O APIC: %d 0x%08x %d\n", s->id, s->address, s->gsi_base);
     } else if (type == APIC_TYPE_INTERRUPT_OVERRIDE) {
       apic_interruptoverride_t *s = (apic_interruptoverride_t *) p;
       if (s->bus != 0)
-        panic(__func__, "Only bus 0 is supported");
+        panic("Only bus 0 is supported");
       irq_map[num_overrides].irq = s->irq;
       irq_map[num_overrides].gsi = s->gsi;
       irq_map[num_overrides].flags = s->flags;
       num_overrides++;
       if (num_overrides > MAX_IRQ_OVERRIDES)
-        panic(__func__, "Exceeds supported max overrides");
+        panic("Exceeds supported max overrides");
       //printf("Found Interrupt Override: %d %d %d 0x%04x\n", s->bus, s->irq, s->gsi, s->flags);
     } else {
       //printf("Unsupported APIC structure %d\n", type);
@@ -138,7 +138,7 @@ static void acpi_parse_rsdt(uint32_t rsdt)
   uint32_t *end = (uint32_t *) (rsdt_p + ((acpi_header_t *) rsdt_p)->length);
 
   if ((uint8_t *) end > va + 2 * PG_SIZE)
-    panic(__func__, "RSDT is too large");
+    panic("RSDT is too large");
 
   while (sdt < end) {
     uint64_t address = (uint64_t) *sdt++;
@@ -162,7 +162,7 @@ static void acpi_parse_xsdt(uint64_t xsdt)
   uint64_t *end = (uint64_t *) (xsdt_p + ((acpi_header_t *) xsdt_p)->length);
 
   if ((uint8_t *) end > va + 2 * PG_SIZE)
-    panic(__func__, "XSDT is too large");
+    panic("XSDT is too large");
 
   while (sdt < end) {
     uint64_t address = *sdt++;
@@ -186,7 +186,7 @@ static bool acpi_parse_rsdp(uint8_t *p)
   for (i = 0; i < 20; ++i) 
     sum += p[i];
   if (sum) 
-    panic(__func__, "Checksum failed");
+    panic("Checksum failed");
 
   // Check version
   revision = p[15];
@@ -206,7 +206,7 @@ static bool acpi_parse_rsdp(uint8_t *p)
     else
       acpi_parse_rsdt(rsdt_addr);
   } else
-    panic(__func__, "Unsupported ACPI version");
+    panic("Unsupported ACPI version");
 
   return true;
 }
@@ -232,7 +232,7 @@ void acpi_init(void)
   }
 
   if (p >= end)
-    panic(__func__, "Can't find RSDP");
+    panic("Can't find RSDP");
 
   if (g_cpus > 1)
     memcpy((uint8_t *) SMP_BOOT_ADDR, ap_boot_start, ap_boot_end - ap_boot_start);
