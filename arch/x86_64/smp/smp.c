@@ -21,11 +21,9 @@
 #include "apic.h"
 #include "percpu.h"
 #include "cpu.h"
-#include "utils/spinlock.h"
 
 extern uint8_t status_code[], ap_stack_ptr[];
 extern uint8_t ap_boot_start[];
-extern spinlock_t boot_lock;
 
 #define BOOT_STATUS() \
 (*((volatile uint64_t *) (SMP_BOOT_ADDR + status_code - ap_boot_start)))
@@ -86,6 +84,7 @@ void ap_main(void)
   tss_t *tss_ptr;
   uint64_t stack;
   uint16_t selector;
+  extern volatile bool virt_start;
 
   /* needs synchronization, so before setting boot status */
   percpu_init();
@@ -104,11 +103,8 @@ void ap_main(void)
   selector = alloc_tss_desc(tss_ptr);
   load_tr(selector);
 
-  spin_lock(&boot_lock);
+  while (virt_start == false) ;
 
-
-
-  spin_unlock(&boot_lock);
 
   //interrupt_enable();
 

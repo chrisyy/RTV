@@ -17,6 +17,7 @@
 
 #include <stdarg.h>
 #include "types.h"
+#include "utils/spinlock.h"
 
 /*  The number of columns. */
 #define COLUMNS                 80
@@ -31,6 +32,7 @@ uint8_t *frameBuf = (uint8_t *) 0xB8000;
 static uint16_t xpos;
 /*  Save the Y position */
 static uint16_t ypos;
+static spinlock_t scr_lock = SPINLOCK_UNLOCKED;
 
 static void _putchar(char c)
 {
@@ -229,6 +231,12 @@ void printf(const char *fmt, ...)
 {
   va_list args;
   va_start(args, fmt);
+
+  spin_lock(&scr_lock);
+
   vprintf(_putchar, fmt, args);
+
+  spin_unlock(&scr_lock);
+
   va_end(args);
 }

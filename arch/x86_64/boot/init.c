@@ -29,15 +29,13 @@
 #include "virt/virt.h"
 #include "boot_info.h"
 #include "mm/malloc.h"
-#include "utils/spinlock.h"
 
 uint8_t kernel_stack[PG_SIZE] ALIGNED(PG_SIZE);
 boot_info_t vm_config = {.config_size = 0};
-spinlock_t boot_lock = SPINLOCK_UNLOCKED;
+volatile bool virt_start = false;
 
 extern uint64_t _boot_start, _boot_pages; 
 extern uint64_t _kernel_code_pages, _kernel_ro_pages, _kernel_rw_pages;
-extern uint8_t ap_boot_start[], ap_boot_end[];
 
 void kernel_main(uint64_t magic, uint64_t mbi)
 {
@@ -184,17 +182,14 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   /* need synchronization after this */
   acpi_sec_init();
 
-  /* remove the first 2MB identity mapping (Recursive Mapping) */
+  /* remove the first 2MB identity mapping, after smp boot */
   *((uint64_t *) 0xFFFFFFFFC0000000) = 0;
   tlb_flush();
 
-  /* TODO assign cores to VMs */
-  spin_lock(&boot_lock);
-
   virt_init(&vm_config);
+  virt_start = true;
+  virt_percpu_init();
 
-  spin_unlock(&boot_lock);
-  
   printf("BSP %u: %u cores\n", get_pcpu_id(), g_cpus);
 
   interrupt_enable();

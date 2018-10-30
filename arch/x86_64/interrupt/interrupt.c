@@ -25,7 +25,8 @@
 typedef struct _hw_regs {
   uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
   uint64_t rdi, rsi, rbp, rdx, rcx, rbx, rax;
-  uint32_t error_code;
+  uint64_t error_code;
+  uint64_t rip, cs, rflags, rsp, ss;
 } PACKED hw_regs_t;
 
 idt_desc idtr;
@@ -82,6 +83,8 @@ void exp_handler(uint64_t irq, hw_regs_t *regs)
   printf("Exception %llu (error code %X):\n", irq, regs->error_code);
   printf("CR0=%llX, CR2=%llX, CR3=%llX, CR4=%llX, CR8=%llX\n", 
          cr0, cr2, cr3, cr4, cr8);
+  printf("RIP=%llX, CS=%llX, RFLAGS=%llX, RSP=%llX, SS=%llX\n",
+         regs->rip, regs->cs, regs->rflags, regs->rsp, regs->ss);
   printf("RAX=%llX, RBX=%llX, RCX=%llX, RDX=%llX, RBP=%llX, " 
          "RSI=%llX, RDI=%llX\n", regs->rax, regs->rbx, regs->rcx, 
          regs->rdx, regs->rbp, regs->rsi, regs->rdi);

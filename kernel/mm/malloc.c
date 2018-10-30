@@ -21,6 +21,7 @@
 #include "mm/physical.h"
 #include "utils/list.h"
 #include "utils/screen.h"
+#include "utils/spinlock.h"
 
 #define BUDDY_MIN_ORDER 5
 #define BUDDY_MAX_ORDER 22
@@ -55,6 +56,7 @@ typedef struct _buddy_bucket
 #define BUDDY_ENTRIES (BUDDY_MAX_ORDER - BUDDY_MIN_ORDER + 1)
 static buddy_bucket_t bsystem[BUDDY_ENTRIES];
 static void *mem_base = 0;
+static spinlock_t mm_lock = SPINLOCK_UNLOCKED;
 
 /* return the minimum N that 2^N >= v */
 static uint8_t next_power2(uint32_t v)
@@ -78,6 +80,8 @@ void check_buddy_table()
   uint8_t entry = 0;
   uint32_t total = 0;
 
+  spin_lock(&mm_lock);
+
   while (1) {
     uint8_t counter = 0;
 
@@ -98,6 +102,7 @@ void check_buddy_table()
   }
 
   printf("Total free memory: %u\n", total);
+  spin_unlock(&mm_lock);
 }
 
 /* See if we can merge */
@@ -152,21 +157,27 @@ void free(void *ptr)
   uint8_t entry;
   buddy_list_t *blt;
 
+  spin_lock(&mm_lock);
+
   addr -= sizeof(uint64_t);
   entry = *addr;
   if (*(addr + bsystem[entry].size - 1) != USED) {
     printf("%s: double free memory %llX\n", __func__, (uint64_t) ptr);
+    spin_unlock(&mm_lock);
     return;
   }
   blt = (buddy_list_t *) addr;
 
-  if (buddy_try_merge(blt, entry))
+  if (buddy_try_merge(blt, entry)) {
+    spin_unlock(&mm_lock);
     return;
+  }
 
   /* no merge, add it to the list */
   *(addr + bsystem[entry].size - 1) = entry;
   list_add(&blt->list, &bsystem[entry].ptr);
   bsystem[entry].count++;
+  spin_unlock(&mm_lock);
 }
 
 static void buddy_split(buddy_bucket_t *bucket)
@@ -208,6 +219,8 @@ void *malloc(uint32_t size)
    */
   uint8_t entry = next_power2(size + 9) - BUDDY_MIN_ORDER;
 
+  spin_lock(&mm_lock);
+
   if (bsystem[entry].count == 0) {
     uint8_t split_count = 0;
 
@@ -234,6 +247,7 @@ void *malloc(uint32_t size)
   pre += sizeof(uint64_t);
   *post = USED;
 
+  spin_unlock(&mm_lock);
   return pre;
 }
 

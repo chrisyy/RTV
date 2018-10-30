@@ -18,6 +18,8 @@
 #include "boot_info.h"
 #include "mm/malloc.h"
 #include "debug.h"
+#include "asm_string.h"
+#include "utils/string.h"
 
 void parse_boot_info(uint8_t *addr, boot_info_t *info)
 {
@@ -40,6 +42,7 @@ void parse_boot_info(uint8_t *addr, boot_info_t *info)
     panic("Failed malloc for num_cpus");
 
   //TODO info->num_cpus[i], info->mod_str[i] (check max length), check if match num_mod, if not, panic
-  info->mod_str[0] = "test";
+  info->mod_str[0] = (char *) malloc(sizeof(char) * BOOT_STRING_MAX);
+  memcpy(info->mod_str[0], "test", strlen("test") + 1);
   info->num_cpus[0] = 1;
 }

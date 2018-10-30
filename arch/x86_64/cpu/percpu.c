@@ -75,22 +75,18 @@ void percpu_init(void)
     panic("out of virtual addresses");
   percpu_virt[pcpu_counter] = (uint8_t *) start_virt;
 
-  seg_desc seg = {
-    .base0 = start_virt & 0xFFFFFF,
-    .base1 = (start_virt >> 24) & 0xFF,
-    .limit0 = limit & 0xFFFF,
-    .limit1 = (limit >> 16) & 0xF,
-    .s = 1,
-    .type = 2,
-    .dpl = 0,
-    .p = 1,
-    .avl = 0,
-    .l = 0,
-    .db = 1,
-    .g = 0
-  };
-
-  memcpy(&gdt_ptr[i], &seg, sizeof(seg_desc));
+  gdt_ptr[i].base0 = start_virt & 0xFFFFFF;
+  gdt_ptr[i].base1 = (start_virt >> 24) & 0xFF;
+  gdt_ptr[i].limit0 = limit & 0xFFFF;
+  gdt_ptr[i].limit1 = (limit >> 16) & 0xF;
+  gdt_ptr[i].s = 1;
+  gdt_ptr[i].type = 2;
+  gdt_ptr[i].dpl = 0;
+  gdt_ptr[i].p = 1;
+  gdt_ptr[i].avl = 0;
+  gdt_ptr[i].l = 0;
+  gdt_ptr[i].db = 1;
+  gdt_ptr[i].g = 0;
 
   i <<= 3;
   __asm__ volatile("movw %0, %%"PER_CPU_SEG_STR"\n" : : "r" (i));

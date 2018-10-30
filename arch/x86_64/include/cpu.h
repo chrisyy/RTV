@@ -8,6 +8,9 @@
 /* skip null + code + data */
 #define GDT_START 3
 
+#define FLAGS_CF  0x1
+#define FLAGS_ZF  0x40
+
 #ifndef __ASSEMBLER__
 #include "types.h"
 

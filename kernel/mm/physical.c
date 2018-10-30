@@ -17,9 +17,11 @@
 
 #include "mm/physical.h"
 #include "utils/bits.h"
+#include "utils/spinlock.h"
 
 static uint64_t mm_table[MM_TABLE_MAX] ALIGNED(PG_SIZE) = {0};
 static uint64_t mm_limit = 0, entry_end = 0;
+static spinlock_t phy_lock = SPINLOCK_UNLOCKED;
 
 void physical_free_range(uint64_t begin, uint64_t length)
 {
@@ -75,6 +77,8 @@ uint64_t alloc_phys_frame(void)
 {
   uint64_t i;
 
+  spin_lock(&phy_lock);
+
   /* skip the first 1MB */
   for (i = 4; i < entry_end; i++) {
     if (mm_table[i]) {
@@ -88,10 +92,12 @@ uint64_t alloc_phys_frame(void)
       }
 
       clear_bit64(&mm_table[i], pos);
+      spin_unlock(&phy_lock);
       return (i * 64 + pos) * PG_SIZE;
     }
   }
 
+  spin_unlock(&phy_lock);
   return 0;
 }
 
@@ -99,6 +105,8 @@ uint64_t alloc_phys_frame(void)
 uint64_t alloc_phys_frames(uint64_t num)
 {
   uint64_t i, pos, count;
+
+  spin_lock(&phy_lock);
 
   /* skip the first 1MB */
   for (i = 4, pos = 256; i < entry_end; ) {
@@ -117,6 +125,7 @@ uint64_t alloc_phys_frames(uint64_t num)
 
       if (count == num) {
         bitmap64_clear_range(mm_table, pos, num);
+        spin_unlock(&phy_lock);
         return pos * PG_SIZE;
       }
 
@@ -128,6 +137,7 @@ uint64_t alloc_phys_frames(uint64_t num)
     }
   }
 
+  spin_unlock(&phy_lock);
   return 0;
 }
 
@@ -135,6 +145,8 @@ uint64_t alloc_phys_frames(uint64_t num)
 uint64_t alloc_phys_frames_aligned(uint64_t num, uint64_t align)
 {
   uint64_t i, pos, count;
+
+  spin_lock(&phy_lock);
 
   /* skip the first 1MB */
   for (i = 4, pos = 256; i < entry_end; ) {
@@ -154,6 +166,7 @@ uint64_t alloc_phys_frames_aligned(uint64_t num, uint64_t align)
 
         if (count == num) {
           bitmap64_clear_range(mm_table, pos, num);
+          spin_unlock(&phy_lock);
           return pos * PG_SIZE;
         }
       }
@@ -166,15 +179,20 @@ uint64_t alloc_phys_frames_aligned(uint64_t num, uint64_t align)
     }
   }
 
+  spin_unlock(&phy_lock);
   return 0;
 }
 
 void free_phys_frame(uint64_t frame)
 {
+  spin_lock(&phy_lock);
   bitmap64_set(mm_table, frame >> PG_BITS);
+  spin_unlock(&phy_lock);
 }
 
 void free_phys_frames(uint64_t frame, uint64_t num)
 {
+  spin_lock(&phy_lock);
   bitmap64_set_range(mm_table, frame >> PG_BITS, num);
+  spin_unlock(&phy_lock);
 }

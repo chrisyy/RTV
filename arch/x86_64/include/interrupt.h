@@ -41,6 +41,4 @@ static inline void interrupt_enable_restore(uint64_t flag)
                    "popfq\n" : : "a" (flag) : );
 }
 
-
-
 #endif

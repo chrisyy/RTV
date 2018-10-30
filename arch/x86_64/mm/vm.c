@@ -21,9 +21,12 @@
 #include "utils/screen.h"
 #include "debug.h"
 #include "asm_string.h"
+#include "utils/spinlock.h"
 
 #define VM_TABLE_ENTRIES (PG_SIZE / sizeof(uint64_t))
 #define VM_TABLE_MASK ((1 << (PG_BITS - 3)) - 1)
+
+static spinlock_t pg_lock = SPINLOCK_UNLOCKED;
 
 /* canonical address, level 0-3: pml4t to pt */
 static uint64_t *get_paging_struct_vaddr(uint64_t *addr, uint8_t level)
@@ -55,6 +58,8 @@ void vm_check_mapping(uint64_t *addr)
   uint64_t *pml4t, *pdpt, *pdt, *pt;
   uint64_t entry;
 
+  spin_lock(&pg_lock);
+
   pml4t = get_paging_struct_vaddr(addr, 0);
   entry = ((uint64_t) addr & 0xFF8000000000) >> 39;
   printf("PML4T entry: %llX\n", pml4t[entry]);
@@ -67,22 +72,30 @@ void vm_check_mapping(uint64_t *addr)
   pt = get_paging_struct_vaddr(addr, 3);
   entry = ((uint64_t) addr & 0x1FF000) >> 12;
   printf("PT entry: %llX\n", pt[entry]);
+
+  spin_unlock(&pg_lock);
 }
 
 void *vm_map_page(uint64_t frame, uint64_t flags)
 {
   uint64_t i;
   void *va;
-  uint64_t *pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
+  uint64_t *pt;
+
+  spin_lock(&pg_lock);
+
+  pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
 
   for (i = 0; i < VM_TABLE_ENTRIES; i++) {
     if (!(pt[i] & PGT_P)) {
       pt[i] = frame | flags;
       va = (void *) (KERNEL_MAPPING_BASE + (i << PG_BITS));
+      spin_unlock(&pg_lock);
       return va;
     }
   }
     
+  spin_unlock(&pg_lock);
   return NULL;
 }
 
@@ -92,9 +105,13 @@ void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags)
   uint64_t i, j;
   void *va;
   uint64_t count = 0;
-  uint64_t *pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
+  uint64_t *pt;
 
   if (num < 1) return NULL;
+
+  spin_lock(&pg_lock);
+
+  pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
 
   for (i = 0; i < VM_TABLE_ENTRIES - num + 1; i++) {
     if (!(pt[i] & PGT_P)) {
@@ -114,6 +131,7 @@ void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags)
         }
 
         va = (void *) (KERNEL_MAPPING_BASE + (i << PG_BITS));
+        spin_unlock(&pg_lock);
         return va;
       } else {
         i = j;
@@ -122,29 +140,38 @@ void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags)
     }
   }
 
+  spin_unlock(&pg_lock);
   return NULL;
 }
 
 uint64_t vm_unmap_page(void *va)
 {
   uint64_t frame;
-  uint64_t *pt = get_paging_struct_vaddr((uint64_t *) va, 3);
+  uint64_t *pt;
   uint64_t i = ((uint64_t) va) >> PG_BITS;
 
+  spin_lock(&pg_lock);
+
+  pt = get_paging_struct_vaddr((uint64_t *) va, 3);
   i &= VM_TABLE_MASK;
   frame = pt[i] & PG_MASK;
   pt[i] = 0;
   invalidate_page(va);
+
+  spin_unlock(&pg_lock);
   return frame;
 }
 
 uint64_t vm_unmap_pages(void *va, uint64_t num)
 {
   uint64_t frame = 0;
-  uint64_t *pt = get_paging_struct_vaddr((uint64_t *) va, 3);
+  uint64_t *pt;
   uint8_t *pg = (uint8_t *) va;
   uint64_t i = ((uint64_t) va) >> PG_BITS;
 
+  spin_lock(&pg_lock);
+
+  pt = get_paging_struct_vaddr((uint64_t *) va, 3);
   i &= VM_TABLE_MASK;
   while (num > 0) {
     if (frame == 0)
@@ -156,6 +183,8 @@ uint64_t vm_unmap_pages(void *va, uint64_t num)
     i++;
     pg += PG_SIZE;
   }
+
+  spin_unlock(&pg_lock);
   return frame;
 }
 
@@ -180,6 +209,8 @@ void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr)
   uint64_t entry;
   uint64_t *pml4t, *pdpt, *pdt, *pt;
   
+  spin_lock(&pg_lock);
+
   pml4t = get_paging_struct_vaddr((uint64_t *) vaddr, 0);
   entry = (vaddr & 0xFF8000000000) >> 39;
   if ((pml4t[entry] & PGT_P) == 0) { 
@@ -212,6 +243,8 @@ void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr)
   if (pt[entry] & PGT_P)
     panic("page table entry not available");
   pt[entry] = frame | flags;
+
+  spin_unlock(&pg_lock);
 }
 
 /* 
@@ -224,6 +257,8 @@ void vm_map_large_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vad
   uint64_t entry;
   uint64_t *pml4t, *pdpt, *pdt;
   
+  spin_lock(&pg_lock);
+
   pml4t = get_paging_struct_vaddr((uint64_t *) vaddr, 0);
   entry = (vaddr & 0xFF8000000000) >> 39;
   if ((pml4t[entry] & PGT_P) == 0) { 
@@ -247,6 +282,8 @@ void vm_map_large_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vad
   if (pdt[entry] & PGT_P)
     panic("page table entry not available");
   pdt[entry] = frame | flags;
+
+  spin_unlock(&pg_lock);
 }
 
 void vm_init(void)
