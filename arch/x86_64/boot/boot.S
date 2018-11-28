@@ -174,9 +174,9 @@ _start:
   movl $pml4t, %eax
   movl %eax, %cr3 
 
-  /* enable PAE paging and PSE */
+  /* enable PAE paging */
   movl %cr4, %eax
-  orl $0x30, %eax
+  orl $0x20, %eax
   movl %eax, %cr4
 
   /* enable long mode + execute disable */

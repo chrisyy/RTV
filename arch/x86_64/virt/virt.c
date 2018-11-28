@@ -25,16 +25,50 @@
 #include "debug.h"
 #include "msr.h"
 #include "utils/screen.h"
+#include "utils/bits.h"
 #include "mm/physical.h"
 
 vm_struct_t *vm_structs;
 uint16_t cpu_to_vm[MAX_CPUS];
 
 static uint64_t vmxon_region[MAX_CPUS];
+static uint64_t vmcs_mem_type = 0;
+static uint32_t vmcs_rev = 0;
+
+static void virt_guest_setup(void)
+{
+  vmwrite(VMCS_GUEST_RFLAGS, 0);
+  
+  vmwrite(VMCS_GUEST_CR0, 1);
+
+  vmwrite(VMCS_GUEST_CR3, 0);
+
+  //XXX: OSFXSR and OSXMMEXCPT?
+  vmwrite(VMCS_GUEST_CR4, 0);
+
+  vmwrite(VMCS_GUEST_DR7, 0);
+}
+
+static void virt_host_setup(void)
+{
+}
 
 void virt_init(boot_info_t *info)
 {
   uint16_t i, j, cur_cpu = 0;
+  uint64_t msr;
+
+  //TODO: check VMX capability
+
+  msr = rdmsr(IA32_VMX_BASIC);
+  vmcs_rev = (uint32_t) msr;
+  if (get_bit64(msr, 44) == 0)
+    panic("VMXON/VMCS size not 4KB");
+  vmcs_mem_type = (msr >> 50) & 0xF;
+  if (vmcs_mem_type == 0)
+    vmcs_mem_type = PGT_PCD;
+  else
+    vmcs_mem_type = 0;
 
   for (i = 0; i < MAX_CPUS; i++)
     cpu_to_vm[i] = VM_NONE;
@@ -47,10 +81,10 @@ void virt_init(boot_info_t *info)
     memcpy(vm_structs[i].name, info->mod_str[i], strlen(info->mod_str[i]) + 1);
     vm_structs[i].vm_id = i;
     vm_structs[i].img_paddr = info->mod_paddr[i];
-    for (j = 0; j < MAX_CPUS; j++)
-      vm_structs[i].vcpu_map[j] = VCPU_NONE;
     vm_structs[i].num_cpus = 0;
     spin_lock_init(&vm_structs[i].lock);
+    for (j = 0; j < MAX_CPUS; j++)
+      vm_structs[i].lauched[j] = false;
 
     if (cur_cpu + info->num_cpus[i] > g_cpus)
       panic("Number of VM CPUs exceeds the available amount");
@@ -79,8 +113,10 @@ void virt_percpu_init(void)
   uint16_t cpu = get_pcpu_id();
   uint16_t vm_id = cpu_to_vm[cpu];
   vm_struct_t *vm;
+  uint16_t vcpu_id;
   uint64_t cr0, cr4, msr;
   uint32_t *vmxon_addr;
+  uint32_t *vmcs_addr;
 
   if (vm_id == VM_NONE)
     return;
@@ -107,22 +143,39 @@ void virt_percpu_init(void)
   wrmsr(IA32_FEATURE_CONTROL, msr);
   //printf("feature: %llX\n", rdmsr(IA32_FEATURE_CONTROL));
 
+  /* VMXON region */
   vmxon_region[cpu] = alloc_phys_frame();
   if (vmxon_region[cpu] == 0)
     panic("VMXON region allocation failed");
-  vmxon_addr = (uint32_t *) vm_map_page(vmxon_region[cpu], PGT_P | PGT_RW);
+  vmxon_addr = (uint32_t *) vm_map_page(vmxon_region[cpu], PGT_P | PGT_RW | vmcs_mem_type);
   if (vmxon_addr == NULL)
     panic("VMXON region mapping failed");
-  *vmxon_addr = (uint32_t) rdmsr(IA32_VMX_BASIC);
+  *vmxon_addr = vmcs_rev;
   vm_unmap_page(vmxon_addr);
 
-  __asm__ volatile("vmxon %0" : : "m" (vmxon_region[cpu]) : "cc");
-
+  vmxon(vmxon_region[cpu]);
   virt_check_error();
 
   spin_lock(&vm->lock);
-
-  vm->vcpu_map[cpu] = vm->num_cpus++;
-
+  vcpu_id = vm->num_cpus++;
   spin_unlock(&vm->lock);
+
+  /* create VMCS */
+  vm->vmcs_paddr[vcpu_id] = alloc_phys_frame();
+  if (vm->vmcs_paddr[vcpu_id] == 0)
+    panic("VMCS allocation failed");
+  vmcs_addr = (uint32_t *) vm_map_page(vm->vmcs_paddr[vcpu_id], PGT_P | PGT_RW | vmcs_mem_type);
+  if (vmcs_addr == NULL)
+    panic("VMCS mapping failed");
+  vmcs_addr[0] = vmcs_rev;
+  vmcs_addr[1] = 0;
+  vm_unmap_page(vmcs_addr);
+
+  vmclear(vm->vmcs_paddr[vcpu_id]);
+  vmptrld(vm->vmcs_paddr[vcpu_id]);
+  virt_check_error();
+
+  virt_guest_setup();
+
+  virt_host_setup();
 }

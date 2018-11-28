@@ -47,6 +47,14 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   uint64_t base, tmp, end;
   uint8_t *config;
 
+  uint64_t test;
+  asm volatile ("movq %%cr0, %0":"=r" (test));
+  printf("cr0: %llX\n", test);
+  asm volatile ("movq %%cr3, %0":"=r" (test));
+  printf("cr3: %llX\n", test);
+  asm volatile ("movq %%cr4, %0":"=r" (test));
+  printf("cr4: %llX\n", test);
+
   /* multiboot2 */
   if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
     printf("Invalid magic number: %X\n", (uint32_t) magic);
