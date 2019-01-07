@@ -19,6 +19,7 @@
 #include "percpu.h"
 #include "mm/physical.h"
 #include "asm_string.h"
+#include "msr.h"
 
 uint8_t *percpu_virt[MAX_CPUS];
 
@@ -42,6 +43,7 @@ void percpu_init(void)
   uint64_t limit;
   uint64_t start_frame;
   seg_desc *gdt_ptr = get_gdt();
+  uint64_t start_virt;
 
   /* 
    * workaround: GCC will eliminate this if-statement when the check
@@ -52,7 +54,7 @@ void percpu_init(void)
   if (pages == 1) {
     /* no per-CPU data, fall back to the usual data segment */
     __asm__ volatile("movw %%ds, %%ax\n"
-                     "movw %%ax, %%"PER_CPU_SEG_STR"\n" : : : "ax");
+                     "movw %%ax, %%fs\n" : : : "ax");
     return;
   }
 
@@ -70,13 +72,11 @@ void percpu_init(void)
   if (start_frame == 0) 
     panic("out of physical memory");
 
-  uint64_t start_virt = (uint64_t) vm_map_pages(start_frame, pages, PGT_P | PGT_RW | PGT_XD);
+  start_virt = (uint64_t) vm_map_pages(start_frame, pages, PGT_P | PGT_RW | PGT_XD);
   if (start_virt == 0) 
     panic("out of virtual addresses");
   percpu_virt[pcpu_counter] = (uint8_t *) start_virt;
 
-  gdt_ptr[i].base0 = start_virt & 0xFFFFFF;
-  gdt_ptr[i].base1 = (start_virt >> 24) & 0xFF;
   gdt_ptr[i].limit0 = limit & 0xFFFF;
   gdt_ptr[i].limit1 = (limit >> 16) & 0xF;
   gdt_ptr[i].s = 1;
@@ -89,7 +89,10 @@ void percpu_init(void)
   gdt_ptr[i].g = 0;
 
   i <<= 3;
-  __asm__ volatile("movw %0, %%"PER_CPU_SEG_STR"\n" : : "r" (i));
+  __asm__ volatile("movw %0, %%fs\n" : : "r" (i));
+
+  /* can only writes 32-bit address to gdt entry, better writes to the MSR */
+  wrmsr(IA32_FS_BASE, start_virt);
 
   /* invoke initialization functions */
   void (**ctor)();

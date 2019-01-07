@@ -8,13 +8,92 @@
 
 #define VM_NONE UINT16_MAX
 
-#define VMCS_INSTR_ERROR    0x4400
+#define VMCS_INSTR_ERROR        0x4400
 
-#define VMCS_GUEST_RFLAGS   0x6820
-#define VMCS_GUEST_CR0      0x6800
-#define VMCS_GUEST_CR3      0x6802
-#define VMCS_GUEST_CR4      0x6804
-#define VMCS_GUEST_DR7      0x681A
+/* guest 64-bit fields */
+#define VMCS_GUEST_LP           0x2800
+#define VMCS_GUEST_EFER         0x2806
+
+/* guest 32-bit fields */
+#define VMCS_GUEST_CS_LMT       0x4802
+#define VMCS_GUEST_DS_LMT       0x4806
+#define VMCS_GUEST_ES_LMT       0x4800
+#define VMCS_GUEST_SS_LMT       0x4804
+#define VMCS_GUEST_FS_LMT       0x4808
+#define VMCS_GUEST_GS_LMT       0x480A
+#define VMCS_GUEST_CS_ACC       0x4816
+#define VMCS_GUEST_DS_ACC       0x481A
+#define VMCS_GUEST_ES_ACC       0x4814
+#define VMCS_GUEST_SS_ACC       0x4818
+#define VMCS_GUEST_FS_ACC       0x481C
+#define VMCS_GUEST_GS_ACC       0x481E
+#define VMCS_GUEST_ACTIVE       0x4826
+#define VMCS_GUEST_INT          0x4824
+
+/* guest 16-bit fields */
+#define VMCS_GUEST_CS_SEL       0x802
+#define VMCS_GUEST_DS_SEL       0x806
+#define VMCS_GUEST_ES_SEL       0x800
+#define VMCS_GUEST_SS_SEL       0x804
+#define VMCS_GUEST_FS_SEL       0x808
+#define VMCS_GUEST_GS_SEL       0x80A
+
+/* guest natural-width fields */
+#define VMCS_GUEST_CS_BASE      0x6808
+#define VMCS_GUEST_DS_BASE      0x680C
+#define VMCS_GUEST_ES_BASE      0x6806
+#define VMCS_GUEST_SS_BASE      0x680A
+#define VMCS_GUEST_FS_BASE      0x680E
+#define VMCS_GUEST_GS_BASE      0x6810
+#define VMCS_GUEST_RFLAGS       0x6820
+#define VMCS_GUEST_CR0          0x6800
+#define VMCS_GUEST_CR3          0x6802
+#define VMCS_GUEST_CR4          0x6804
+#define VMCS_GUEST_DR7          0x681A
+#define VMCS_GUEST_DEBUG        0x6822
+#define VMCS_GUEST_RIP          0x681E
+
+/* host natural-width fields */
+#define VMCS_HOST_CR0           0x6C00
+#define VMCS_HOST_CR3           0x6C02
+#define VMCS_HOST_CR4           0x6C04
+#define VMCS_HOST_FS_BASE       0x6C06
+#define VMCS_HOST_GS_BASE       0x6C08
+#define VMCS_HOST_TR_BASE       0x6C0A
+#define VMCS_HOST_GDTR_BASE     0x6C0C
+#define VMCS_HOST_IDTR_BASE     0x6C0E
+
+/* host 16-bit fields */
+#define VMCS_HOST_CS_SEL        0xC02
+#define VMCS_HOST_DS_SEL        0xC06
+#define VMCS_HOST_ES_SEL        0xC00
+#define VMCS_HOST_SS_SEL        0xC04
+#define VMCS_HOST_FS_SEL        0xC08
+#define VMCS_HOST_GS_SEL        0xC0A
+#define VMCS_HOST_TR_SEL        0xC0C
+
+/* control 32-bit fields */
+#define VMCS_CTRL_PIN           0x4000
+#define VMCS_CTRL_PPROC         0x4002
+#define VMCS_CTRL_SPROC         0x401E
+#define VMCS_CTRL_EXP_MAP       0x4004
+#define VMCS_CTRL_EXIT          0x400C
+#define VMCS_CTRL_EXIT_SCNT     0x400E
+#define VMCS_CTRL_EXIT_LCNT     0x4010
+#define VMCS_CTRL_ENTRY         0x4012
+#define VMCS_CTRL_ENTRY_LCNT    0x4014
+#define VMCS_CTRL_ENTRY_INT     0x4016
+
+/* control 64-bit fields */
+#define VMCS_CTRL_IOMAP_A       0x2000
+#define VMCS_CTRL_IOMAP_B       0x2002
+#define VMCS_CTRL_EPTP          0x201A
+
+/* control natural-width fields */
+#define VMCS_CTRL_CR0_MASK      0x6000
+#define VMCS_CTRL_CR4_MASK      0x6002
+#define VMCS_CTRL_CR0_RD        0x6004
+#define VMCS_CTRL_CR4_RD        0x6006
 
 typedef struct _vm_struct_t {
   uint16_t vm_id;
@@ -30,6 +109,8 @@ extern vm_struct_t *vm_structs;
 extern uint16_t cpu_to_vm[MAX_CPUS];
 
 void virt_check_error(void);
+
+uint64_t virt_pg_table_setup(void);
 
 static inline uint64_t vmread(uint64_t encoding)
 {

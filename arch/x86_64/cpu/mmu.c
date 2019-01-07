@@ -57,3 +57,12 @@ uint16_t alloc_tss_desc(tss_t *tss_p)
   panic("out of GDT entries");
   return 0;
 }
+
+uint64_t get_gdt_tss_base(uint16_t sel)
+{
+  seg_desc *gdt_ptr = get_gdt();
+  tss_desc *entry = (tss_desc *) &gdt_ptr[sel >> 3];
+  uint64_t base = entry->base1;
+  base = (base << 24) | entry->base0;
+  return base;
+}

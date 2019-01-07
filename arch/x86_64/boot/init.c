@@ -47,13 +47,10 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   uint64_t base, tmp, end;
   uint8_t *config;
 
-  uint64_t test;
-  asm volatile ("movq %%cr0, %0":"=r" (test));
-  printf("cr0: %llX\n", test);
-  asm volatile ("movq %%cr3, %0":"=r" (test));
-  printf("cr3: %llX\n", test);
-  asm volatile ("movq %%cr4, %0":"=r" (test));
-  printf("cr4: %llX\n", test);
+  extern uint16_t my_cs, my_ds;
+  extern uint32_t my_cr0, my_cr3, my_cr4;
+
+  printf("cr0 %X, cr3 %X, cr4 %X, cs %X, ds %X\n", my_cr0, my_cr3, my_cr4, my_cs, my_ds);
 
   /* multiboot2 */
   if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {

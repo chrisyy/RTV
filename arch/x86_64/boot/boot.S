@@ -37,6 +37,22 @@ tmp_stack:
   .skip 0x1000
 stack_top:
 
+  .global my_cr0
+  .global my_cr3
+  .global my_cr4
+  .global my_cs
+  .global my_ds
+my_cr0:
+  .skip 0x4
+my_cr3:
+  .skip 0x4
+my_cr4:
+  .skip 0x4
+my_cs:
+  .skip 0x2
+my_ds:
+  .skip 0x2
+
   .section .data
   .align 0x1000
 gdt64:
@@ -92,6 +108,17 @@ _start:
   movl %ebx, %esi
   movl $new_multiboot, %edi
   rep movsb
+
+  movl %cr0, %eax
+  movl %eax, my_cr0
+  movl %cr3, %eax
+  movl %eax, my_cr3
+  movl %cr4, %eax
+  movl %eax, my_cr4
+  movw %cs, %ax
+  movw %ax, my_cs
+  movw %ds, %ax
+  movw %ax, my_ds
 
   /* disable paging */
   movl %cr0, %eax

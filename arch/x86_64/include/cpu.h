@@ -73,7 +73,10 @@ typedef struct _idt_desc {
   uint64_t base;
 } PACKED idt_desc;
 
+#define gdt_desc idt_desc
+
 uint16_t alloc_tss_desc(tss_t *tss_p);
+uint64_t get_gdt_tss_base(uint16_t sel);
 
 static inline seg_desc *get_gdt(void)
 {

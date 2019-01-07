@@ -4,7 +4,7 @@
 #include "debug.h"
 #include "cpu.h"
 
-#define PER_CPU_SEG_STR "fs"
+/* using FS register for percpu data segment */
 
 /* Define a per-CPU variable */
 #define DEF_PER_CPU(type, var) __attribute__ ((section(".percpu"))) type var
@@ -16,7 +16,7 @@
     __##var##_ctor_func;                                                        \
   void __##var##_ctor_func(void)
 
-#define __percpu_arg(x) "%%"PER_CPU_SEG_STR":%"#x
+#define __percpu_arg(x) "%%fs:%"#x
 
 #define percpu_write(var, val)                          \
   do {                                                  \
