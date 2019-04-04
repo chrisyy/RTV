@@ -10,7 +10,7 @@ typedef union _spinlock {
   uint32_t data;
   struct {
     uint16_t next;
-    uint16_t owner;
+    volatile uint16_t owner;
   } obj;
 } spinlock_t;
 

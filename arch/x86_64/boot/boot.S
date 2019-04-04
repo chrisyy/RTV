@@ -120,11 +120,6 @@ _start:
   movw %ds, %ax
   movw %ax, my_ds
 
-  /* disable paging */
-  movl %cr0, %eax
-  andl $0x7FFFFFFF, %eax
-  movl %eax, %cr0
-
   /* set up first 2MB identity mapping */
   movl $pdpt + 3, %eax  /* present+write bits */
   movl %eax, pml4t
@@ -212,9 +207,10 @@ _start:
   orl $0x900, %eax
   wrmsr
 
-  /* enable paging */
+  /* enable paging/cache */
   movl %cr0, %eax
   orl $0x80000000, %eax
+  andl $0x9FFFFFFF, %eax
   movl %eax, %cr0 
 
   lgdt gdt_ptr

@@ -23,8 +23,6 @@
 #include "asm_string.h"
 #include "utils/spinlock.h"
 
-#define VM_TABLE_ENTRIES (PG_SIZE / sizeof(uint64_t))
-#define VM_TABLE_MASK ((1 << (PG_BITS - 3)) - 1)
 
 static spinlock_t pg_lock = SPINLOCK_UNLOCKED;
 
@@ -86,7 +84,7 @@ void *vm_map_page(uint64_t frame, uint64_t flags)
 
   pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
 
-  for (i = 0; i < VM_TABLE_ENTRIES; i++) {
+  for (i = 0; i < PG_TABLE_ENTRIES; i++) {
     if (!(pt[i] & PGT_P)) {
       pt[i] = frame | flags;
       va = (void *) (KERNEL_MAPPING_BASE + (i << PG_BITS));
@@ -113,7 +111,7 @@ void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags)
 
   pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
 
-  for (i = 0; i < VM_TABLE_ENTRIES - num + 1; i++) {
+  for (i = 0; i < PG_TABLE_ENTRIES - num + 1; i++) {
     if (!(pt[i] & PGT_P)) {
       count++;
 
@@ -153,7 +151,7 @@ uint64_t vm_unmap_page(void *va)
   spin_lock(&pg_lock);
 
   pt = get_paging_struct_vaddr((uint64_t *) va, 3);
-  i &= VM_TABLE_MASK;
+  i &= PG_TABLE_MASK;
   frame = pt[i] & PG_MASK;
   pt[i] = 0;
   invalidate_page(va);
@@ -172,7 +170,7 @@ uint64_t vm_unmap_pages(void *va, uint64_t num)
   spin_lock(&pg_lock);
 
   pt = get_paging_struct_vaddr((uint64_t *) va, 3);
-  i &= VM_TABLE_MASK;
+  i &= PG_TABLE_MASK;
   while (num > 0) {
     if (frame == 0)
       frame = pt[i] & PG_MASK;
@@ -322,6 +320,6 @@ void vm_init(void)
   }
 
   pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
-  for (i = 0; i < VM_TABLE_ENTRIES; i++) 
+  for (i = 0; i < PG_TABLE_ENTRIES; i++) 
     pt[i] = 0;
 }

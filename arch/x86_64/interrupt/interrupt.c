@@ -102,7 +102,7 @@ void exp_handler(uint64_t irq, hw_regs_t *regs)
 
 void isr_handler(uint64_t irq)
 {
-  //printf("interrupt %u\n", irq);
+  printf("interrupt %u\n", irq);
   lapic_eoi();
 }
 

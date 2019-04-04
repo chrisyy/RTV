@@ -13,6 +13,7 @@ typedef struct _boot_info_t {
   uint64_t *mod_paddr;
   uint64_t *mod_size;
   uint16_t *num_cpus;
+  uint32_t *ram_size;
 } boot_info_t;
 
 void parse_boot_info(uint8_t *addr, boot_info_t *info);

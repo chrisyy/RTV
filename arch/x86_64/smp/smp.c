@@ -19,8 +19,11 @@
 #include "mm/physical.h"
 #include "debug.h"
 #include "apic.h"
+#include "acpi.h"
 #include "percpu.h"
 #include "cpu.h"
+#include "utils/spinlock.h"
+#include "interrupt.h"
 
 extern uint8_t status_code[], ap_stack_ptr[];
 extern uint8_t ap_boot_start[];
@@ -84,6 +87,8 @@ void ap_main(void)
   tss_t *tss_ptr;
   uint64_t stack;
   uint16_t selector;
+  extern spinlock_t mtrr_lock;
+  extern volatile uint8_t mtrr_sync;
   extern volatile bool virt_start;
 
   /* needs synchronization, so before setting boot status */
@@ -103,10 +108,22 @@ void ap_main(void)
   selector = alloc_tss_desc(tss_ptr);
   load_tr(selector);
 
-  while (virt_start == false) ;
+  spin_lock(&mtrr_lock);
+  mtrr_sync++;
+  spin_unlock(&mtrr_lock);
+  while (mtrr_sync != g_cpus) ;
 
+  mtrr_config();
 
-  //interrupt_enable();
+  spin_lock(&mtrr_lock);
+  mtrr_sync--;
+  spin_unlock(&mtrr_lock);
+  while (mtrr_sync != 0) ;
+
+  while (!virt_start) ;
+  //virt_percpu_init();
+
+  interrupt_enable();
 
   while(1);
 }

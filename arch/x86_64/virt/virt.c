@@ -29,16 +29,25 @@
 #include "utils/bits.h"
 #include "mm/physical.h"
 
+#define VIRT_DEBUG
+
 vm_struct_t *vm_structs;
 uint16_t cpu_to_vm[MAX_CPUS];
 
 static uint64_t vmxon_region[MAX_CPUS];
 static uint64_t vmcs_mem_type = 0;
 static uint32_t vmcs_rev = 0;
+static uint8_t hyp_stack[PG_SIZE] ALIGNED(PG_SIZE);
+
+static void virt_main(void)
+{
+  panic("virt_main");
+}
 
 static void virt_guest_setup(void)
 {
   vmwrite(VMCS_GUEST_RFLAGS, 0);
+  /* PE, ET */
   vmwrite(VMCS_GUEST_CR0, 0x11);
   vmwrite(VMCS_GUEST_CR3, 0);
   vmwrite(VMCS_GUEST_CR4, 0);
@@ -79,9 +88,11 @@ static void virt_guest_setup(void)
   vmwrite(VMCS_GUEST_INT, 0);
   vmwrite(VMCS_GUEST_DEBUG, 0);
   vmwrite(VMCS_GUEST_EFER, 0);
+  vmwrite(VMCS_GUEST_PAT, rdmsr(IA32_PAT));
+  vmwrite(VMCS_GUEST_RSP, 0);
   
-  //TODO
-  vmwrite(VMCS_GUEST_RIP, 0x90000);
+  //TODO: 2MB
+  vmwrite(VMCS_GUEST_RIP, 0x200000);
 }
 
 static void virt_host_setup(void)
@@ -135,7 +146,24 @@ static void virt_host_setup(void)
   __asm__ volatile("sidt %0" : "=m" (idtr));
   vmwrite(VMCS_HOST_IDTR_BASE, idtr.base);
 
-  //TODO rsp/rip
+  vmwrite(VMCS_HOST_EFER, rdmsr(IA32_EFER));
+  vmwrite(VMCS_HOST_PAT, rdmsr(IA32_PAT));
+
+  vmwrite(VMCS_HOST_RSP, (uint64_t) &hyp_stack[PG_SIZE - 1]);
+  vmwrite(VMCS_HOST_RIP, (uint64_t) virt_main);
+
+#ifdef VIRT_DEBUG
+  printf("Host: CR0 %llX, CR3 %llX, CR4 %llX\n", 
+         vmread(VMCS_HOST_CR0), vmread(VMCS_HOST_CR3), 
+         vmread(VMCS_HOST_CR4));
+  printf("Host: FS base %llX, GS base %llX, TR base %llX\n", 
+         vmread(VMCS_HOST_FS_BASE), vmread(VMCS_HOST_GS_BASE),
+         vmread(VMCS_HOST_TR_BASE));
+  printf("Host: EFER %llX, PAT %llX\n", vmread(VMCS_HOST_EFER),
+         vmread(VMCS_HOST_PAT));
+  printf("Host: RSP %llX, RIP %llX\n", vmread(VMCS_HOST_RSP), 
+         vmread(VMCS_HOST_RIP));
+#endif
 }
 
 static void virt_control_setup(uint64_t ept_p)
@@ -148,12 +176,20 @@ static void virt_control_setup(uint64_t ept_p)
 
     exit_msr = rdmsr(IA32_VMX_TRUE_EXIT_CTLS);
     entry_msr = rdmsr(IA32_VMX_TRUE_ENTRY_CTLS);
+#ifdef VIRT_DEBUG
+    printf("TRUE: pin %llX, proc %llX, exit %llX, entry %llX\n",
+           pin_msr, proc_msr, exit_msr, entry_msr);
+#endif
   } else {
     pin_msr = rdmsr(IA32_VMX_PINBASED_CTLS);
     proc_msr = rdmsr(IA32_VMX_PROCBASED_CTLS);
 
     exit_msr = rdmsr(IA32_VMX_EXIT_CTLS);
     entry_msr = rdmsr(IA32_VMX_ENTRY_CTLS);
+#ifdef VIRT_DEBUG
+    printf("FALSE: pin %llX, proc %llX, exit %llX, entry %llX\n",
+           pin_msr, proc_msr, exit_msr, entry_msr);
+#endif
   }
 
   /* load/save IA32_EFER, host address-space size */
@@ -170,7 +206,7 @@ static void virt_control_setup(uint64_t ept_p)
     panic("32-bit VM entry not supported");
   if (!get_bit64(entry_msr, 47))
     panic("Load IA32_EFER not supported");
-  vmwrite(VMCS_CTRL_ENTRY, 0x8000);
+  vmwrite(VMCS_CTRL_ENTRY, entry_msr | 0x8000);
   vmwrite(VMCS_CTRL_ENTRY_LCNT, 0);
   vmwrite(VMCS_CTRL_ENTRY_INT, 0);
 
@@ -183,6 +219,9 @@ static void virt_control_setup(uint64_t ept_p)
 
   /* enable EPT, unrestricted guest */
   proc2_msr = rdmsr(IA32_VMX_PROCBASED_CTLS2);
+#ifdef VIRT_DEBUG
+  printf("proc2: %llX\n", proc2_msr);
+#endif
   if (!get_bit64(proc2_msr, 33))
     panic("EPT not supported");
   if (!get_bit64(proc2_msr, 39))
@@ -194,22 +233,37 @@ static void virt_control_setup(uint64_t ept_p)
   vmwrite(VMCS_CTRL_IOMAP_B, 0);
   vmwrite(VMCS_CTRL_CR0_MASK, 0);
   vmwrite(VMCS_CTRL_CR0_RD, 0);
+  vmwrite(VMCS_CTRL_CR3_CNT, 0);
+  vmwrite(VMCS_CTRL_PF_MASK, 0);
+  vmwrite(VMCS_CTRL_PF_MATCH, 0);
 
   /* host controlled VMXE */
   vmwrite(VMCS_CTRL_CR4_MASK, 0x2000);
   vmwrite(VMCS_CTRL_CR4_RD, 0);
 
-  vmwrite(VMCS_CTRL_EPTP, ept_p | 6 | 0x18);
+  /* write-back */
+  vmwrite(VMCS_CTRL_EPTP, ept_p | 0x6 | (3 << 3));
 
   //TODO enable VPID for performance
+
+#ifdef VIRT_DEBUG
+  printf("Dump: pin %llX, proc %llX, proc2 %llX, exit %llX, entry %llX\n",
+         vmread(VMCS_CTRL_PIN), vmread(VMCS_CTRL_PPROC),
+         vmread(VMCS_CTRL_SPROC), vmread(VMCS_CTRL_EXIT), 
+         vmread(VMCS_CTRL_ENTRY));
+#endif
 }
 
 void virt_init(boot_info_t *info)
 {
   uint16_t i, j, cur_cpu = 0;
   uint64_t msr;
+  uint32_t ecx;
 
-  //TODO: check VMX capability
+  /* check VMX capability */
+  cpuid(1, 0, NULL, NULL, &ecx, NULL);
+  if (get_bit64((uint64_t) ecx, 5) == 0)
+    panic("VMX not supported");
 
   msr = rdmsr(IA32_VMX_BASIC);
   vmcs_rev = (uint32_t) msr;
@@ -233,6 +287,7 @@ void virt_init(boot_info_t *info)
     vm_structs[i].vm_id = i;
     vm_structs[i].img_paddr = info->mod_paddr[i];
     vm_structs[i].num_cpus = 0;
+    vm_structs[i].ram_size = info->ram_size[i];
     spin_lock_init(&vm_structs[i].lock);
     for (j = 0; j < MAX_CPUS; j++)
       vm_structs[i].lauched[j] = false;
@@ -244,19 +299,11 @@ void virt_init(boot_info_t *info)
   }
 }
 
-void virt_check_error(void)
+void virt_diagnose(void)
 {
-  uint64_t flags;
-
-  __asm__ volatile("pushfq\n"
-                   "pop %0" : "=r" (flags));
-
-  if (flags & FLAGS_CF)
-    panic("Invalid VMCS pointer");
-  else if (flags & FLAGS_ZF) {
-    printf("Error number: %u\n", vmread(VMCS_INSTR_ERROR));
-    panic("VMX error");
-  }
+  uint64_t reason = vmread(VMCS_EXIT_REASON);
+  uint64_t qual = vmread(VMCS_EXIT_QUAL);
+  printf("Reason %llX, qual %llX\n", reason, qual);
 }
 
 void virt_percpu_init(void)
@@ -269,6 +316,7 @@ void virt_percpu_init(void)
   uint32_t *vmxon_addr;
   uint32_t *vmcs_addr;
   uint64_t ept_p;
+  uint64_t flags;
 
   if (vm_id == VM_NONE)
     return;
@@ -289,8 +337,13 @@ void virt_percpu_init(void)
   __asm__ volatile("movq %0, %%cr4\n" : : "r" (cr4));
   //printf("cr4: %llX\n", cr4);
 
-  /* set lock bit and enable VMX outside SMX operation */
+  /* 
+   * per-CPU MSR
+   * set lock bit and enable VMX outside SMX operation 
+   */
   msr = rdmsr(IA32_FEATURE_CONTROL);
+  if (get_bit64(msr, 0) && !get_bit64(msr, 2))
+    panic("VMX is disabled");
   msr |= 1 | (1 << 2);
   wrmsr(IA32_FEATURE_CONTROL, msr);
   //printf("feature: %llX\n", rdmsr(IA32_FEATURE_CONTROL));
@@ -299,14 +352,15 @@ void virt_percpu_init(void)
   vmxon_region[cpu] = alloc_phys_frame();
   if (vmxon_region[cpu] == 0)
     panic("VMXON region allocation failed");
-  vmxon_addr = (uint32_t *) vm_map_page(vmxon_region[cpu], PGT_P | PGT_RW | vmcs_mem_type);
+  vmxon_addr = (uint32_t *) vm_map_page(vmxon_region[cpu], 
+                                        PGT_P | PGT_RW | vmcs_mem_type);
   if (vmxon_addr == NULL)
     panic("VMXON region mapping failed");
   *vmxon_addr = vmcs_rev;
   vm_unmap_page(vmxon_addr);
 
   vmxon(vmxon_region[cpu]);
-  virt_check_error();
+  virt_check_error(flags);
 
   spin_lock(&vm->lock);
   vcpu_id = vm->num_cpus++;
@@ -316,7 +370,8 @@ void virt_percpu_init(void)
   vm->vmcs_paddr[vcpu_id] = alloc_phys_frame();
   if (vm->vmcs_paddr[vcpu_id] == 0)
     panic("VMCS allocation failed");
-  vmcs_addr = (uint32_t *) vm_map_page(vm->vmcs_paddr[vcpu_id], PGT_P | PGT_RW | vmcs_mem_type);
+  vmcs_addr = (uint32_t *) vm_map_page(vm->vmcs_paddr[vcpu_id], 
+                                       PGT_P | PGT_RW | vmcs_mem_type);
   if (vmcs_addr == NULL)
     panic("VMCS mapping failed");
   vmcs_addr[0] = vmcs_rev;
@@ -325,9 +380,9 @@ void virt_percpu_init(void)
 
   vmclear(vm->vmcs_paddr[vcpu_id]);
   vmptrld(vm->vmcs_paddr[vcpu_id]);
-  virt_check_error();
+  virt_check_error(flags);
 
-  ept_p = virt_pg_table_setup();
+  ept_p = virt_pg_table_setup(vm->ram_size);
 
   virt_guest_setup();
 
@@ -335,5 +390,10 @@ void virt_percpu_init(void)
 
   virt_host_setup();
 
-  //TODO
+  __asm__ volatile("vmlaunch" : : : "cc", "memory");
+
+  virt_check_error(flags);
+  virt_diagnose();
+
+  panic("Unreachable");
 }

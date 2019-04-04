@@ -18,6 +18,7 @@
 #include "cpu.h"
 #include "debug.h"
 #include "utils/spinlock.h"
+#include "msr.h"
 
 spinlock_t gdt_lock = SPINLOCK_UNLOCKED;
 
@@ -65,4 +66,20 @@ uint64_t get_gdt_tss_base(uint16_t sel)
   uint64_t base = entry->base1;
   base = (base << 24) | entry->base0;
   return base;
+}
+
+void mtrr_config(void)
+{
+  uint8_t i, cnt;
+
+  /* default type WB, disable fixed MTRR, disable MTRR */
+  wrmsr(IA32_MTRR_DEF_TYPE, 0x6);
+
+  /* disable variable MTRR */
+  cnt = (uint8_t) (rdmsr(IA32_MTRRCAP) & 0xFF);
+  for (i = 0; i < cnt; i++)
+    wrmsr(IA32_MTRR_PHYSMASK(i), 0);
+
+  /* enable MTRR */
+  wrmsr(IA32_MTRR_DEF_TYPE, 0x806);
 }

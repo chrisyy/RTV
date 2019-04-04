@@ -7,6 +7,10 @@
 #define PG_SIZE (1 << PG_BITS)
 #define PG_MASK (~((uint64_t) PG_SIZE - 1))
 
+#define PG_TABLE_ENTRIES (PG_SIZE / sizeof(uint64_t))
+#define PG_TABLE_BITS (PG_BITS - 3)
+#define PG_TABLE_MASK ((1 << PG_TABLE_BITS) - 1)
+
 #define LARGE_PG_BITS 21
 #define LARGE_PG_SIZE (1 << LARGE_PG_BITS)
 

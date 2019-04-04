@@ -141,7 +141,7 @@ uint64_t alloc_phys_frames(uint64_t num)
   return 0;
 }
 
-/* allocate contiguous page frames, starting address aligned */
+/* allocate contiguous page frames, starting address aligned to align bytes */
 uint64_t alloc_phys_frames_aligned(uint64_t num, uint64_t align)
 {
   uint64_t i, pos, count;

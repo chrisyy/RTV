@@ -41,8 +41,13 @@ void parse_boot_info(uint8_t *addr, boot_info_t *info)
   if (info->num_cpus == NULL)
     panic("Failed malloc for num_cpus");
 
+  info->ram_size = (uint32_t *) malloc(sizeof(uint32_t) * info->num_mod);
+  if (info->ram_size == NULL)
+    panic("Failed malloc for ram_size");
+
   //TODO info->num_cpus[i], info->mod_str[i] (check max length), check if match num_mod, if not, panic
   info->mod_str[0] = (char *) malloc(sizeof(char) * BOOT_STRING_MAX);
   memcpy(info->mod_str[0], "test", strlen("test") + 1);
   info->num_cpus[0] = 1;
+  info->ram_size[0] = 16;
 }

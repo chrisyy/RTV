@@ -3,6 +3,9 @@
 
 /* MSR */
 #define IA32_FEATURE_CONTROL          0x3A
+#define IA32_MTRRCAP                  0xFE
+#define IA32_PAT                      0x277
+#define IA32_MTRR_DEF_TYPE            0x2FF
 #define IA32_VMX_BASIC                0x480
 #define IA32_VMX_PINBASED_CTLS        0x481
 #define IA32_VMX_PROCBASED_CTLS       0x482
@@ -20,5 +23,7 @@
 #define IA32_EFER                     0xC0000080
 #define IA32_FS_BASE                  0xC0000100
 #define IA32_GS_BASE                  0xC0000101
+
+#define IA32_MTRR_PHYSMASK(n)        (0x201 + (n << 1))
 
 #endif

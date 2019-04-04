@@ -26,16 +26,21 @@
 #include "percpu.h"
 #include "smp.h"
 #include "utils/string.h"
+#include "utils/bits.h"
 #include "virt/virt.h"
 #include "boot_info.h"
 #include "mm/malloc.h"
+#include "utils/spinlock.h"
 
 uint8_t kernel_stack[PG_SIZE] ALIGNED(PG_SIZE);
 boot_info_t vm_config = {.config_size = 0};
+spinlock_t mtrr_lock = SPINLOCK_UNLOCKED;
+volatile uint8_t mtrr_sync = 0;
 volatile bool virt_start = false;
 
 extern uint64_t _boot_start, _boot_pages; 
 extern uint64_t _kernel_code_pages, _kernel_ro_pages, _kernel_rw_pages;
+
 
 void kernel_main(uint64_t magic, uint64_t mbi)
 {
@@ -190,6 +195,21 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   /* remove the first 2MB identity mapping, after smp boot */
   *((uint64_t *) 0xFFFFFFFFC0000000) = 0;
   tlb_flush();
+
+  spin_lock(&mtrr_lock);
+  mtrr_sync++;
+  spin_unlock(&mtrr_lock);
+  /* required synchronization for mtrr update */
+  while (mtrr_sync != g_cpus) ;
+
+  mtrr_config();
+
+  spin_lock(&mtrr_lock);
+  mtrr_sync--;
+  spin_unlock(&mtrr_lock);
+  while (mtrr_sync != 0) ;
+
+  //TODO: flush cache
 
   virt_init(&vm_config);
   virt_start = true;
