@@ -48,6 +48,7 @@ void parse_boot_info(uint8_t *addr, boot_info_t *info)
   //TODO info->num_cpus[i], info->mod_str[i] (check max length), check if match num_mod, if not, panic
   info->mod_str[0] = (char *) malloc(sizeof(char) * BOOT_STRING_MAX);
   memcpy(info->mod_str[0], "test", strlen("test") + 1);
+  //XXX: hardcoded 1 cpu, 16MB ram
   info->num_cpus[0] = 1;
   info->ram_size[0] = 16;
 }

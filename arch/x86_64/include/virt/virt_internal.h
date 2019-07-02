@@ -11,14 +11,31 @@
 /* exit information 32-bit fields */
 #define VMCS_INSTR_ERROR        0x4400
 #define VMCS_EXIT_REASON        0x4402
+#define VMCS_EXIT_INT_INFO      0x4404
+#define VMCS_EXIT_INT_CODE      0x4406
+#define VMCS_EXIT_IDT_INFO      0x4408
+#define VMCS_EXIT_IDT_CODE      0x440A
+#define VMCS_INSTR_LENGTH       0x440C
+#define VMCS_INSTR_INFO         0x440E
+
+/* exit information 64-bit fields */
+#define VMCS_PHY_ADDR           0x2400
 
 /* exit information natural-width fields */
 #define VMCS_EXIT_QUAL          0x6400
+#define VMCS_LINEAR_ADDR        0x640A
 
 /* guest 64-bit fields */
 #define VMCS_GUEST_LP           0x2800
 #define VMCS_GUEST_EFER         0x2806
 #define VMCS_GUEST_PAT          0x2804
+#define VMCS_GUEST_PDPTE0       0x280A
+#define VMCS_GUEST_PDPTE1       0x280C
+#define VMCS_GUEST_PDPTE2       0x280E
+#define VMCS_GUEST_PDPTE3       0x2810
+#define VMCS_GUEST_DEBUGCTL     0x2802
+#define VMCS_GUEST_PERF         0x2808
+#define VMCS_GUEST_BNDCFGS      0x2812
 
 /* guest 32-bit fields */
 #define VMCS_GUEST_CS_LMT       0x4802
@@ -27,14 +44,23 @@
 #define VMCS_GUEST_SS_LMT       0x4804
 #define VMCS_GUEST_FS_LMT       0x4808
 #define VMCS_GUEST_GS_LMT       0x480A
+#define VMCS_GUEST_LDTR_LMT     0x480C
+#define VMCS_GUEST_TR_LMT       0x480E
+#define VMCS_GUEST_GDTR_LMT     0x4810
+#define VMCS_GUEST_IDTR_LMT     0x4812
 #define VMCS_GUEST_CS_ACC       0x4816
 #define VMCS_GUEST_DS_ACC       0x481A
 #define VMCS_GUEST_ES_ACC       0x4814
 #define VMCS_GUEST_SS_ACC       0x4818
 #define VMCS_GUEST_FS_ACC       0x481C
 #define VMCS_GUEST_GS_ACC       0x481E
+#define VMCS_GUEST_LDTR_ACC     0x4820
+#define VMCS_GUEST_TR_ACC       0x4822
 #define VMCS_GUEST_ACTIVE       0x4826
 #define VMCS_GUEST_INT          0x4824
+#define VMCS_GUEST_SMBASE       0x4828
+#define VMCS_GUEST_SYS_CS       0x482A
+#define VMCS_GUEST_TIMER        0x482E
 
 /* guest 16-bit fields */
 #define VMCS_GUEST_CS_SEL       0x802
@@ -43,6 +69,10 @@
 #define VMCS_GUEST_SS_SEL       0x804
 #define VMCS_GUEST_FS_SEL       0x808
 #define VMCS_GUEST_GS_SEL       0x80A
+#define VMCS_GUEST_LDTR_SEL     0x80C
+#define VMCS_GUEST_TR_SEL       0x80E
+#define VMCS_GUEST_STATUS       0x810
+#define VMCS_GUEST_PML          0x812
 
 /* guest natural-width fields */
 #define VMCS_GUEST_CS_BASE      0x6808
@@ -51,6 +81,10 @@
 #define VMCS_GUEST_SS_BASE      0x680A
 #define VMCS_GUEST_FS_BASE      0x680E
 #define VMCS_GUEST_GS_BASE      0x6810
+#define VMCS_GUEST_LDTR_BASE    0x6812
+#define VMCS_GUEST_TR_BASE      0x6814
+#define VMCS_GUEST_GDTR_BASE    0x6816
+#define VMCS_GUEST_IDTR_BASE    0x6818
 #define VMCS_GUEST_RFLAGS       0x6820
 #define VMCS_GUEST_CR0          0x6800
 #define VMCS_GUEST_CR3          0x6802
@@ -59,6 +93,8 @@
 #define VMCS_GUEST_DEBUG        0x6822
 #define VMCS_GUEST_RIP          0x681E
 #define VMCS_GUEST_RSP          0x681C
+#define VMCS_GUEST_SYS_ESP      0x6824
+#define VMCS_GUEST_SYS_EIP      0x6826
 
 /* host natural-width fields */
 #define VMCS_HOST_CR0           0x6C00
@@ -119,6 +155,9 @@
 #define EPT_IPAT  0x40
 #define EPT_PG    0x80
 
+#define EPT_TYPE_UC 0
+#define EPT_TYPE_WB 6
+
 typedef struct _vm_struct_t {
   uint16_t vm_id;
   char name[BOOT_STRING_MAX];
@@ -146,8 +185,6 @@ do {                              \
   }                                                         \
 } while (0)
 
-uint64_t virt_pg_table_setup(uint32_t size);
-
 static inline uint64_t vmread(uint64_t encoding)
 {
   uint64_t value;
@@ -174,5 +211,7 @@ static inline void vmptrld(uint64_t paddr)
 {
   __asm__ volatile("vmptrld %0" : : "m" (paddr) : "cc");
 }
+
+uint64_t virt_pg_table_setup(uint32_t size);
 
 #endif

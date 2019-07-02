@@ -29,7 +29,7 @@
 #include "utils/bits.h"
 #include "mm/physical.h"
 
-#define VIRT_DEBUG
+//#define VIRT_DEBUG
 
 vm_struct_t *vm_structs;
 uint16_t cpu_to_vm[MAX_CPUS];
@@ -37,62 +37,169 @@ uint16_t cpu_to_vm[MAX_CPUS];
 static uint64_t vmxon_region[MAX_CPUS];
 static uint64_t vmcs_mem_type = 0;
 static uint32_t vmcs_rev = 0;
-static uint8_t hyp_stack[PG_SIZE] ALIGNED(PG_SIZE);
+
+void virt_guest_dump(void)
+{
+  printf("RIP %llX, RSP %llX, RFLAGS %llX\n", vmread(VMCS_GUEST_RIP),
+         vmread(VMCS_GUEST_RSP), vmread(VMCS_GUEST_RFLAGS));
+  printf("Base: CS %llX, DS %llX\n", vmread(VMCS_GUEST_CS_BASE),
+         vmread(VMCS_GUEST_DS_BASE));
+  printf("Limit: CS %X, DS %X\n", vmread(VMCS_GUEST_CS_LMT),
+         vmread(VMCS_GUEST_DS_LMT));
+}
+
+uint16_t virt_diagnose(void)
+{
+  uint64_t reason = vmread(VMCS_EXIT_REASON);
+  uint64_t qual = vmread(VMCS_EXIT_QUAL);
+  uint16_t basic = (uint16_t) reason & 0xFFFF;
+
+  if (get_bit64(reason, 31)) {
+    printf("VM-entry failure: reason %u qualification %llX\n",
+           basic, qual);
+  } else {
+#if 1
+//#ifdef VIRT_DEBUG
+    printf("VM-exit: reason %u qualification %llX\n",
+           basic, qual);
+    printf("guest address %llX (linear) %llX (physical),\n"
+           "interrupt %llX (info) %llX (code),\n"
+           "IDT %llX (info) %llX (code),\n"
+           "instruction %llX (length) %llX (info)\n",
+           vmread(VMCS_LINEAR_ADDR), vmread(VMCS_PHY_ADDR),
+           vmread(VMCS_EXIT_INT_INFO), vmread(VMCS_EXIT_INT_CODE),
+           vmread(VMCS_EXIT_IDT_INFO), vmread(VMCS_EXIT_IDT_CODE),
+           vmread(VMCS_INSTR_LENGTH), vmread(VMCS_INSTR_INFO));
+
+    virt_guest_dump();
+#endif
+  }
+
+  return basic;
+}
 
 static void virt_main(void)
 {
+  uint64_t flags;
+  virt_diagnose();
   panic("virt_main");
+
+  __asm__ volatile("vmresume" : : : "cc", "memory");
+
+  virt_check_error(flags);
+  virt_diagnose();
 }
 
 static void virt_guest_setup(void)
 {
-  vmwrite(VMCS_GUEST_RFLAGS, 0);
-  /* PE, ET */
-  vmwrite(VMCS_GUEST_CR0, 0x11);
+  uint64_t val;
+
+  /* bit-1 reserved */
+  vmwrite(VMCS_GUEST_RFLAGS, 0x2);
   vmwrite(VMCS_GUEST_CR3, 0);
-  vmwrite(VMCS_GUEST_CR4, 0);
   vmwrite(VMCS_GUEST_DR7, 0);
 
-  vmwrite(VMCS_GUEST_CS_SEL, 0x10);
+  /* PE, ET */
+  val = 0x11;
+  val = rdmsr(IA32_VMX_CR0_FIXED0);
+  val &= rdmsr(IA32_VMX_CR0_FIXED1);
+  /* no PG */
+  val &= 0x7FFFFFFF;
+  vmwrite(VMCS_GUEST_CR0, val);
+
+  val = rdmsr(IA32_VMX_CR4_FIXED0);
+  val &= rdmsr(IA32_VMX_CR4_FIXED1);
+  vmwrite(VMCS_GUEST_CR4, val);
+
+  /* accessed bit must be 1, 32-bit code, granularity 1 */
+  vmwrite(VMCS_GUEST_CS_SEL, 0x8);
   vmwrite(VMCS_GUEST_CS_BASE, 0);
   vmwrite(VMCS_GUEST_CS_LMT, 0xFFFFFFFF);
-  vmwrite(VMCS_GUEST_CS_ACC, 0x209A);
+  vmwrite(VMCS_GUEST_CS_ACC, 0xC09B);
 
-  vmwrite(VMCS_GUEST_DS_SEL, 0x18);
+  /* accessed bit must be 1, granularity 1 */
+  vmwrite(VMCS_GUEST_DS_SEL, 0x10);
   vmwrite(VMCS_GUEST_DS_BASE, 0);
   vmwrite(VMCS_GUEST_DS_LMT, 0xFFFFFFFF);
-  vmwrite(VMCS_GUEST_DS_ACC, 0x0092);
+  vmwrite(VMCS_GUEST_DS_ACC, 0xC093);
 
-  vmwrite(VMCS_GUEST_ES_SEL, 0x18);
+  /* accessed bit must be 1, granularity 1 */
+  vmwrite(VMCS_GUEST_ES_SEL, 0x10);
   vmwrite(VMCS_GUEST_ES_BASE, 0);
   vmwrite(VMCS_GUEST_ES_LMT, 0xFFFFFFFF);
-  vmwrite(VMCS_GUEST_ES_ACC, 0x0092);
+  vmwrite(VMCS_GUEST_ES_ACC, 0xC093);
 
-  vmwrite(VMCS_GUEST_SS_SEL, 0x18);
+  /* accessed bit must be 1, granularity 1 */
+  vmwrite(VMCS_GUEST_SS_SEL, 0x10);
   vmwrite(VMCS_GUEST_SS_BASE, 0);
   vmwrite(VMCS_GUEST_SS_LMT, 0xFFFFFFFF);
-  vmwrite(VMCS_GUEST_SS_ACC, 0x0092);
+  vmwrite(VMCS_GUEST_SS_ACC, 0xC093);
 
-  vmwrite(VMCS_GUEST_FS_SEL, 0x18);
+  /* accessed bit must be 1, granularity 1 */
+  vmwrite(VMCS_GUEST_FS_SEL, 0x10);
   vmwrite(VMCS_GUEST_FS_BASE, 0);
   vmwrite(VMCS_GUEST_FS_LMT, 0xFFFFFFFF);
-  vmwrite(VMCS_GUEST_FS_ACC, 0x0092);
+  vmwrite(VMCS_GUEST_FS_ACC, 0xC093);
 
-  vmwrite(VMCS_GUEST_GS_SEL, 0x18);
+  /* accessed bit must be 1, granularity 1 */
+  vmwrite(VMCS_GUEST_GS_SEL, 0x10);
   vmwrite(VMCS_GUEST_GS_BASE, 0);
   vmwrite(VMCS_GUEST_GS_LMT, 0xFFFFFFFF);
-  vmwrite(VMCS_GUEST_GS_ACC, 0x0092);
+  vmwrite(VMCS_GUEST_GS_ACC, 0xC093);
+
+  /* set to unusable */
+  vmwrite(VMCS_GUEST_LDTR_SEL, 0);
+  vmwrite(VMCS_GUEST_LDTR_BASE, 0);
+  vmwrite(VMCS_GUEST_LDTR_LMT, 0xFFFFF);
+  vmwrite(VMCS_GUEST_LDTR_ACC, 0x10082);
+
+  /* TI flag must be 0 */
+  vmwrite(VMCS_GUEST_TR_SEL, 0);
+  vmwrite(VMCS_GUEST_TR_BASE, 0);
+  vmwrite(VMCS_GUEST_TR_LMT, 0xFFFFF);
+  vmwrite(VMCS_GUEST_TR_ACC, 0x408B);
+
+  vmwrite(VMCS_GUEST_GDTR_BASE, 0);
+  vmwrite(VMCS_GUEST_GDTR_LMT, 0xFFFF);
+  vmwrite(VMCS_GUEST_IDTR_BASE, 0);
+  vmwrite(VMCS_GUEST_IDTR_LMT, 0xFFFF);
 
   vmwrite(VMCS_GUEST_LP, UINT64_MAX);
   vmwrite(VMCS_GUEST_ACTIVE, 0);
   vmwrite(VMCS_GUEST_INT, 0);
   vmwrite(VMCS_GUEST_DEBUG, 0);
+  vmwrite(VMCS_GUEST_SMBASE, 0);
+  vmwrite(VMCS_GUEST_SYS_CS, 0);
+  vmwrite(VMCS_GUEST_SYS_ESP, 0);
+  vmwrite(VMCS_GUEST_SYS_EIP, 0);
+  vmwrite(VMCS_GUEST_TIMER, 0);
+  vmwrite(VMCS_GUEST_STATUS, 0);
+  vmwrite(VMCS_GUEST_PML, 0);
+  vmwrite(VMCS_GUEST_PDPTE0, 0);
+  vmwrite(VMCS_GUEST_PDPTE1, 0);
+  vmwrite(VMCS_GUEST_PDPTE2, 0);
+  vmwrite(VMCS_GUEST_PDPTE3, 0);
+  vmwrite(VMCS_GUEST_DEBUGCTL, 0);
+  vmwrite(VMCS_GUEST_PERF, 0);
+  vmwrite(VMCS_GUEST_BNDCFGS, 0);
   vmwrite(VMCS_GUEST_EFER, 0);
   vmwrite(VMCS_GUEST_PAT, rdmsr(IA32_PAT));
   vmwrite(VMCS_GUEST_RSP, 0);
-  
-  //TODO: 2MB
-  vmwrite(VMCS_GUEST_RIP, 0x200000);
+
+  /* quest initial IP: 1MB */
+  vmwrite(VMCS_GUEST_RIP, 0x100000);
+
+#ifdef VIRT_DEBUG
+  printf("Guest: link pointer %llX, PAT %llX, RIP %llX\n",
+         vmread(VMCS_GUEST_LP), vmread(VMCS_GUEST_PAT),
+         vmread(VMCS_GUEST_RIP));
+  printf("Guest: CR0 %llX (fixed0 %llX, fixed1 %llX)\n",
+         vmread(VMCS_GUEST_CR0), rdmsr(IA32_VMX_CR0_FIXED0),
+         rdmsr(IA32_VMX_CR0_FIXED1));
+  printf("Guest: CR4 %llX (fixed0 %llX, fixed1 %llX)\n",
+         vmread(VMCS_GUEST_CR4), rdmsr(IA32_VMX_CR4_FIXED0),
+         rdmsr(IA32_VMX_CR4_FIXED1));
+#endif
 }
 
 static void virt_host_setup(void)
@@ -100,6 +207,7 @@ static void virt_host_setup(void)
   uint64_t reg;
   uint16_t sel;
   uint64_t base;
+  uint64_t stack;
   gdt_desc gdtr;
   idt_desc idtr;
 
@@ -149,7 +257,9 @@ static void virt_host_setup(void)
   vmwrite(VMCS_HOST_EFER, rdmsr(IA32_EFER));
   vmwrite(VMCS_HOST_PAT, rdmsr(IA32_PAT));
 
-  vmwrite(VMCS_HOST_RSP, (uint64_t) &hyp_stack[PG_SIZE - 1]);
+  __asm__ volatile("movq %%rsp, %0" : "=r" (stack));
+  stack = (stack & PG_MASK) + PG_SIZE;
+  vmwrite(VMCS_HOST_RSP, stack);
   vmwrite(VMCS_HOST_RIP, (uint64_t) virt_main);
 
 #ifdef VIRT_DEBUG
@@ -176,20 +286,12 @@ static void virt_control_setup(uint64_t ept_p)
 
     exit_msr = rdmsr(IA32_VMX_TRUE_EXIT_CTLS);
     entry_msr = rdmsr(IA32_VMX_TRUE_ENTRY_CTLS);
-#ifdef VIRT_DEBUG
-    printf("TRUE: pin %llX, proc %llX, exit %llX, entry %llX\n",
-           pin_msr, proc_msr, exit_msr, entry_msr);
-#endif
   } else {
     pin_msr = rdmsr(IA32_VMX_PINBASED_CTLS);
     proc_msr = rdmsr(IA32_VMX_PROCBASED_CTLS);
 
     exit_msr = rdmsr(IA32_VMX_EXIT_CTLS);
     entry_msr = rdmsr(IA32_VMX_ENTRY_CTLS);
-#ifdef VIRT_DEBUG
-    printf("FALSE: pin %llX, proc %llX, exit %llX, entry %llX\n",
-           pin_msr, proc_msr, exit_msr, entry_msr);
-#endif
   }
 
   /* load/save IA32_EFER, host address-space size */
@@ -201,12 +303,14 @@ static void virt_control_setup(uint64_t ept_p)
   vmwrite(VMCS_CTRL_EXIT_SCNT, 0);
   vmwrite(VMCS_CTRL_EXIT_LCNT, 0);
 
-  /* first time entry in 32-bit mode, load IA32_EFER */
+  /* first time entry in 32-bit mode, load IA32_EFER/IA32_PAT */
   if (get_bit64(entry_msr, 9))
     panic("32-bit VM entry not supported");
   if (!get_bit64(entry_msr, 47))
     panic("Load IA32_EFER not supported");
-  vmwrite(VMCS_CTRL_ENTRY, entry_msr | 0x8000);
+  if (!get_bit64(entry_msr, 46))
+    panic("Load IA32_PAT not supported");
+  vmwrite(VMCS_CTRL_ENTRY, entry_msr | 0xC000);
   vmwrite(VMCS_CTRL_ENTRY_LCNT, 0);
   vmwrite(VMCS_CTRL_ENTRY_INT, 0);
 
@@ -219,9 +323,6 @@ static void virt_control_setup(uint64_t ept_p)
 
   /* enable EPT, unrestricted guest */
   proc2_msr = rdmsr(IA32_VMX_PROCBASED_CTLS2);
-#ifdef VIRT_DEBUG
-  printf("proc2: %llX\n", proc2_msr);
-#endif
   if (!get_bit64(proc2_msr, 33))
     panic("EPT not supported");
   if (!get_bit64(proc2_msr, 39))
@@ -247,7 +348,7 @@ static void virt_control_setup(uint64_t ept_p)
   //TODO enable VPID for performance
 
 #ifdef VIRT_DEBUG
-  printf("Dump: pin %llX, proc %llX, proc2 %llX, exit %llX, entry %llX\n",
+  printf("Control: pin %llX, proc %llX, proc2 %llX, exit %llX, entry %llX\n",
          vmread(VMCS_CTRL_PIN), vmread(VMCS_CTRL_PPROC),
          vmread(VMCS_CTRL_SPROC), vmread(VMCS_CTRL_EXIT), 
          vmread(VMCS_CTRL_ENTRY));
@@ -299,13 +400,6 @@ void virt_init(boot_info_t *info)
   }
 }
 
-void virt_diagnose(void)
-{
-  uint64_t reason = vmread(VMCS_EXIT_REASON);
-  uint64_t qual = vmread(VMCS_EXIT_QUAL);
-  printf("Reason %llX, qual %llX\n", reason, qual);
-}
-
 void virt_percpu_init(void)
 {
   uint16_t cpu = get_pcpu_id();
@@ -328,14 +422,12 @@ void virt_percpu_init(void)
   cr0 |= rdmsr(IA32_VMX_CR0_FIXED0);
   cr0 &= rdmsr(IA32_VMX_CR0_FIXED1);
   __asm__ volatile("movq %0, %%cr0\n" : : "r" (cr0));
-  //printf("cr0: %llX\n", cr0);
 
   /* VMX fixed bits in CR4 */
   __asm__ volatile("movq %%cr4, %0\n" : "=r" (cr4));
   cr4 |= rdmsr(IA32_VMX_CR4_FIXED0);
   cr4 &= rdmsr(IA32_VMX_CR4_FIXED1);
   __asm__ volatile("movq %0, %%cr4\n" : : "r" (cr4));
-  //printf("cr4: %llX\n", cr4);
 
   /* 
    * per-CPU MSR
@@ -346,7 +438,6 @@ void virt_percpu_init(void)
     panic("VMX is disabled");
   msr |= 1 | (1 << 2);
   wrmsr(IA32_FEATURE_CONTROL, msr);
-  //printf("feature: %llX\n", rdmsr(IA32_FEATURE_CONTROL));
 
   /* VMXON region */
   vmxon_region[cpu] = alloc_phys_frame();
@@ -394,6 +485,4 @@ void virt_percpu_init(void)
 
   virt_check_error(flags);
   virt_diagnose();
-
-  panic("Unreachable");
 }

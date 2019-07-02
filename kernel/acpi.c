@@ -23,6 +23,7 @@
 #include "percpu.h"
 #include "apic.h"
 #include "smp.h"
+#include "virt/iommu.h"
 
 uint16_t g_cpus = 1;
 
@@ -74,7 +75,7 @@ static void acpi_parse_apic(acpi_madt_t *madt)
   extern uint8_t *lapic_addr;
   extern uint8_t *ioapic_addr;
   extern uint32_t gsi_base;
-  
+
   lapic_addr = (uint8_t *) (uint64_t) madt->lapic_addr;
 
   p = (uint8_t *) (madt + 1);
@@ -116,16 +117,42 @@ static void acpi_parse_apic(acpi_madt_t *madt)
   }
 }
 
-static void acpi_parse_dt(acpi_header_t *header)
-{ 
-  //char sigstr[5];
-  //memcpy(sigstr, &signature, 4);
-  //sigstr[4] = 0;
-  //printf("%s 0x%x\n", sigstr, signature);
+static void acpi_parse_dmar(acpi_dmar_t *dmar)
+{
+  //printf("DMAR: oem %s, table id %s, %X, %X\n", dmar->header.oem, dmar->header.table_id, dmar->addr_width, dmar->flags);
 
-  /* "APIC" */
+  uint8_t *p, *end;
+
+  p = (uint8_t *) (dmar + 1);
+  end = (uint8_t *) dmar + dmar->header.length;
+
+  while (p < end) {
+    dmar_header_t *header = (dmar_header_t *) p;
+    uint16_t type = header->type;
+    uint16_t length = header->length;
+
+    if (type == DMAR_TYPE_DRHD) {
+      //dmar_drhd_t *drhd = (dmar_drhd_t *) p;
+      //iommu_init(drhd->base_addr);
+    } else {
+      printf("Unsupported remapping structure type %d\n", type);
+    }
+
+    p += length;
+  }
+}
+
+static void acpi_parse_dt(acpi_header_t *header)
+{
+  //char sigstr[5];
+  //memcpy(sigstr, &(header->signature), 4);
+  //sigstr[4] = 0;
+  //printf("%s 0x%x, revision %d\n", sigstr, header->signature, header->revision);
+
   if (header->signature == 0x43495041)
     acpi_parse_apic((acpi_madt_t *) header);
+  else if (header->signature == 0x52414D44)
+    acpi_parse_dmar((acpi_dmar_t *) header);
 }
 
 static void acpi_parse_rsdt(uint32_t rsdt)
@@ -178,25 +205,30 @@ static void acpi_parse_xsdt(uint64_t xsdt)
 
 static bool acpi_parse_rsdp(uint8_t *p)
 {
-  // Verify checksum
   uint8_t sum = 0;
   uint8_t i;
   uint8_t revision;
 
-  for (i = 0; i < 20; ++i) 
+  // Verify checksum
+  for (i = 0; i < 20; ++i)
     sum += p[i];
-  if (sum) 
-    panic("Checksum failed");
+  if (sum)
+    panic("V1 checksum failed");
 
   // Check version
   revision = p[15];
   if (revision == 0) {
-    //printf("Version 1\n");
-
-    uint32_t rsdt_addr = *(uint32_t *) (p + 16); 
+    /* ACPI version 1 */
+    uint32_t rsdt_addr = *(uint32_t *) (p + 16);
     acpi_parse_rsdt(rsdt_addr);
   } else if (revision == 2) {
-    //printf("Version 2\n");
+    /* ACPI version 2+ */
+
+    // Verify checksum
+    for (i = 20; i < 34; ++i)
+      sum += p[i];
+    if (sum)
+      panic("V2 checksum failed");
 
     uint32_t rsdt_addr = *(uint32_t *) (p + 16);
     uint64_t xsdt_addr = *(uint64_t *) (p + 24);
@@ -211,8 +243,17 @@ static bool acpi_parse_rsdp(uint8_t *p)
   return true;
 }
 
-void acpi_init(void)
+void acpi_init(uint8_t *rsdp)
 {
+  uint64_t signature;
+
+  if (rsdp != NULL) {
+    signature = *(uint64_t *) rsdp;
+    /* "RSD PTR " */
+    if (signature == 0x2052545020445352 && acpi_parse_rsdp(rsdp))
+      goto END;
+  }
+
   uint8_t *p, *end;
 
   /* Search main BIOS area below 1MB, identity mapping */
@@ -220,24 +261,23 @@ void acpi_init(void)
   end = (uint8_t *) 0x000fffff;
 
   while (p < end) {
-    uint64_t signature = *(uint64_t *)p;
+    signature = *(uint64_t *)p;
 
-    /* "RSD PTR" */
-    if (signature == 0x2052545020445352) {
-      if (acpi_parse_rsdp(p)) 
-          break;
-    }
+    /* "RSD PTR " */
+    if (signature == 0x2052545020445352 && acpi_parse_rsdp(p))
+      break;
 
     p += 16;
   }
 
+  //TODO - Search Extended BIOS Data Area
+
   if (p >= end)
     panic("Can't find RSDP");
 
+END:
   if (g_cpus > 1)
     memcpy((uint8_t *) SMP_BOOT_ADDR, ap_boot_start, ap_boot_end - ap_boot_start);
-
-  //TODO - Search Extended BIOS Data Area
 }
 
 uint32_t acpi_irq_to_gsi(uint8_t irq, uint16_t *flags)

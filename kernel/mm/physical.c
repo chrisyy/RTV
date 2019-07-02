@@ -23,6 +23,10 @@ static uint64_t mm_table[MM_TABLE_MAX] ALIGNED(PG_SIZE) = {0};
 static uint64_t mm_limit = 0, entry_end = 0;
 static spinlock_t phy_lock = SPINLOCK_UNLOCKED;
 
+/*
+ * begin: start physical address
+ * length: in bytes
+ */
 void physical_free_range(uint64_t begin, uint64_t length)
 {
   uint64_t remain = begin % PG_SIZE;
@@ -44,6 +48,11 @@ void physical_take_range(uint64_t begin, uint64_t length)
   else
     bitmap64_clear_range(mm_table, begin >> PG_BITS, 
                          (length + remain + PG_SIZE - end_remain) >> PG_BITS);
+}
+
+bool physical_is_free(uint64_t addr)
+{
+  return bitmap64_check_bit(mm_table, addr >> PG_BITS);
 }
 
 void physical_set_limit(uint64_t limit)
@@ -141,41 +150,63 @@ uint64_t alloc_phys_frames(uint64_t num)
   return 0;
 }
 
-/* allocate contiguous page frames, starting address aligned to align bytes */
+/*
+ * allocate contiguous page frames,
+ * starting address aligned to 'align' bytes
+ * (align == 2^n)
+ */
 uint64_t alloc_phys_frames_aligned(uint64_t num, uint64_t align)
 {
   uint64_t i, pos, count;
+  uint64_t pos_inc = align / PG_SIZE;
+  uint64_t i_inc = pos_inc / 64;
 
   spin_lock(&phy_lock);
 
   /* skip the first 1MB */
-  for (i = 4, pos = 256; i < entry_end; ) {
+  i = i_inc <= 4 ? 4 : i_inc;
+  pos = i * 64;
+
+  for ( ; i < entry_end; ) {
     if (mm_table[i]) {
       uint64_t cur;
+      uint64_t remain;
 
-      while (bitmap64_get(mm_table, pos) == 0)
-        pos++;
-      
+      while (pos < mm_limit && bitmap64_get(mm_table, pos) == 0)
+        pos += pos_inc;
+
       cur = pos;
-      if ((cur * PG_SIZE) % align == 0) {
-        count = 0;
-        while (count < num && bitmap64_get(mm_table, cur)) {
-          cur++;
-          count++;
-        }
+      count = 0;
+      while (count < num && cur < mm_limit && bitmap64_get(mm_table, cur)) {
+        cur++;
+        count++;
+      }
 
-        if (count == num) {
-          bitmap64_clear_range(mm_table, pos, num);
-          spin_unlock(&phy_lock);
-          return pos * PG_SIZE;
-        }
+      if (count == num) {
+        bitmap64_clear_range(mm_table, pos, num);
+        spin_unlock(&phy_lock);
+        return pos * PG_SIZE;
+      }
+
+      if (cur >= mm_limit) {
+        /* out of memory */
+        spin_unlock(&phy_lock);
+        return 0;
       }
 
       pos = cur + 1;
+      remain = pos % pos_inc;
+      if (remain != 0)
+        pos = pos + pos_inc - remain;
       i = pos >> 6;
     } else {
-      i++;
-      pos += 64;
+      if (i_inc > 0) {
+        i += i_inc;
+        pos += pos_inc;
+      } else {
+        i += 1;
+        pos += 64;
+      }
     }
   }
 

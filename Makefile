@@ -16,7 +16,7 @@ DEPS := $(OBJS:.o=.d)
 INC_FLAGS := -Iinclude -Iarch/$(ARCH)/include
 ISO_DIR := iso
 
-CFLAGS := -ffreestanding -mcmodel=large -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -g -Wall -MMD -lgcc $(INC_FLAGS) $(CFG)
+CFLAGS := -ffreestanding -mcmodel=large -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -g -Wall -Werror -MMD -lgcc $(INC_FLAGS) $(CFG)
 LDFLAGS := -nostdlib -z max-page-size=4096
 
 .PHONY: all iso clean
@@ -46,10 +46,11 @@ iso:
 	grub-mkrescue -o $(PROG).iso $(ISO_DIR)
 
 run:
-	qemu-system-x86_64 -cdrom $(PROG).iso -m 4G -smp 2 -enable-kvm -cpu host &
+	qemu-system-x86_64 -machine q35,iommu=on -cdrom $(PROG).iso -m 4G -smp 2 -enable-kvm -cpu host &
+	@# -device intel-iommu,intremap=on
 
 debug:
-	qemu-system-x86_64 -s -S -d int,guest_errors,mmu -D qemu.log -cdrom $(PROG).iso -m 4G -smp 2 -enable-kvm -cpu host &
+	qemu-system-x86_64 -s -S -d int,guest_errors,mmu -D qemu.log -machine q35,iommu=on -cdrom $(PROG).iso -m 4G -smp 2 -enable-kvm -cpu host &
 
 clean:
 	rm -rf $(OBJS) $(PROG) $(DEPS) $(PROG).iso $(ISO_DIR)

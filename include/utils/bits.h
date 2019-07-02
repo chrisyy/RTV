@@ -38,7 +38,7 @@ static inline void bitmap64_clear(uint64_t *map, uint64_t index)
 }
 
 extern void bitmap64_set_range(uint64_t *map, uint64_t begin, uint64_t length);
-
 extern void bitmap64_clear_range(uint64_t *map, uint64_t begin, uint64_t length);
+extern bool bitmap64_check_bit(uint64_t *map, uint64_t index);
 
 #endif

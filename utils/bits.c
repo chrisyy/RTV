@@ -66,3 +66,17 @@ void bitmap64_clear_range(uint64_t *map, uint64_t begin, uint64_t length)
     *ptr &= ~mask;
   }
 }
+
+/*
+ * index: bit index to the map
+ * return true if bit set
+ */
+bool bitmap64_check_bit(uint64_t *map, uint64_t index)
+{
+  uint64_t *ptr = map + (index >> 6);
+  uint64_t mask = 1 << (index % 64);
+  if ((*ptr) & mask)
+    return true;
+  else
+    return false;
+}

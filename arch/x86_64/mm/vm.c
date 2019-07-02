@@ -320,6 +320,6 @@ void vm_init(void)
   }
 
   pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
-  for (i = 0; i < PG_TABLE_ENTRIES; i++) 
+  for (i = 0; i < PG_TABLE_ENTRIES; i++)
     pt[i] = 0;
 }

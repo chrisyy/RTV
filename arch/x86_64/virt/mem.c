@@ -21,10 +21,11 @@
 #include "mm/physical.h"
 #include "asm_string.h"
 #include "utils/screen.h"
+#include "virt/linux.h"
 
-/* 
+/*
  * size: ram size in MB, even number only
- * returns the physical address of the EPT base 
+ * returns the physical address of the EPT base
  */
 uint64_t virt_pg_table_setup(uint32_t size)
 {
@@ -32,9 +33,9 @@ uint64_t virt_pg_table_setup(uint32_t size)
   uint64_t *pml4t_virt, *pdpt_virt;
   uint32_t pdt_entries = size >> 1;
   uint32_t pdpt_entries = (pdt_entries + (PG_TABLE_ENTRIES - 1)) >> PG_TABLE_BITS;
-  uint32_t count = 0;
+  /* number of 4KB pages */
+  uint32_t count = 0, bound = pdt_entries * PG_TABLE_ENTRIES;
   uint32_t i, j;
-  uint32_t pages = 1 << (LARGE_PG_BITS - PG_BITS);
 
   pml4t_phy = alloc_phys_frame();
   if (pml4t_phy == 0)
@@ -56,12 +57,15 @@ uint64_t virt_pg_table_setup(uint32_t size)
   /* max memory size supported: 512GB */
   pml4t_virt[0] = pdpt_phy | EPT_RD | EPT_WR | EPT_EX;
 
+  /* mark memory allocated to linux */
+  physical_take_range(LINUX_PHY_START, size << 20);
+
   for (i = 0; i < pdpt_entries; i++) {
     uint64_t *pdt_virt;
     uint64_t frame;
-    
+
     frame = alloc_phys_frame();
-    if (frame == 0) 
+    if (frame == 0)
       panic("Failed to allocate a PDT frame");
     pdpt_virt[i] = frame | EPT_RD | EPT_WR | EPT_EX;
 
@@ -70,33 +74,60 @@ uint64_t virt_pg_table_setup(uint32_t size)
       panic("Failed to map PDT");
 
     for (j = 0; j < PG_TABLE_ENTRIES; j++) {
-      frame = alloc_phys_frames_aligned(pages, LARGE_PG_SIZE);
-      if (frame == 0)
-        panic("Failed to allocate a 2MB frame");
-      pdt_virt[j] = frame | EPT_RD | EPT_WR | EPT_EX | EPT_PG 
-                    | EPT_TP(6) | EPT_IPAT;
-      
-      count++;
-      if (count >= pdt_entries) break;
+      uint64_t frame_offset = PG_SIZE * PG_TABLE_ENTRIES * PG_TABLE_ENTRIES * i
+                              + PG_SIZE * PG_TABLE_ENTRIES * j;
 
-      // XXX: 32-bit test starts at 2MB
-      if (i == 0 && j == 1) {
-        uint16_t *test_addr = (uint16_t *) vm_map_page(frame, PGT_P | PGT_RW);
-        test_addr[0] = 0x2fb4;
-        test_addr[1] = 0x02b9;
-        test_addr[2] = 0x0000;
-        test_addr[3] = 0xbe00;
-        test_addr[4] = 0x0018;
-        test_addr[5] = 0x0020;
-        test_addr[6] = 0x00bf;
-        test_addr[7] = 0x0b80;
-        test_addr[8] = 0xac00;
-        test_addr[9] = 0xab66;
-        test_addr[10] = 0xfbe2;
-        test_addr[11] = 0x00f4;
-        test_addr[12] = 0x4b4f;//string 'OK' 0x200018
-        vm_unmap_page(test_addr);
+      /* first 2MB */
+      if (i == 0 && j == 0) {
+        uint16_t k;
+        uint64_t *pt_virt;
+        uint64_t pt_frame = alloc_phys_frame();
+        if (pt_frame == 0)
+          panic("Failed to allocate a PT frame");
+        pdt_virt[j] = pt_frame | EPT_RD | EPT_WR | EPT_EX;
+
+        pt_virt = (uint64_t *) vm_map_page(pt_frame, PGT_P | PGT_RW);
+        if (pt_virt == NULL)
+          panic("Failed to map PT");
+
+        frame_offset -= PG_SIZE;
+        for (k = 0; k < PG_TABLE_ENTRIES; k++) {
+          frame_offset += PG_SIZE;
+          /* identity mapping for the first MB */
+          if (k == 0xB8)
+            pt_virt[k] = frame_offset | EPT_RD | EPT_WR | EPT_TP(EPT_TYPE_UC);
+          else if (k < PG_TABLE_ENTRIES / 2)
+            pt_virt[k] = frame_offset | EPT_RD | EPT_WR | EPT_EX
+                         | EPT_TP(EPT_TYPE_WB);
+          else
+            pt_virt[k] = (frame_offset + LINUX_PHY_START) | EPT_RD
+                         | EPT_WR | EPT_EX | EPT_TP(EPT_TYPE_WB);
+
+          //TODO: 32-bit test starts at 1MB
+          if (k == PG_TABLE_ENTRIES / 2) {
+            uint16_t *test_addr = (uint16_t *) vm_map_page(frame_offset
+                                  + LINUX_PHY_START, PGT_P | PGT_RW);
+
+            //print OK: movl imm32, 0xB8000
+            test_addr[0] = 0x05c7;
+            test_addr[1] = 0x8000;
+            test_addr[2] = 0x000b;
+            test_addr[3] = 0x2f4f;//(green)O
+            test_addr[4] = 0x2f4b;//(green)K
+            test_addr[5] = 0xf4f4;//hlt
+
+            vm_unmap_page(test_addr);
+          }
+        }
+
+        vm_unmap_page(pt_virt);
+      } else {
+        pdt_virt[j] = (frame_offset + LINUX_PHY_START) | EPT_RD | EPT_WR
+                      | EPT_EX | EPT_PG | EPT_TP(EPT_TYPE_WB);
       }
+
+      count += PG_TABLE_ENTRIES;
+      if (count >= bound) break;
     }
 
     vm_unmap_page(pdt_virt);

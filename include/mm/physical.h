@@ -8,6 +8,7 @@
 
 extern void physical_free_range(uint64_t begin, uint64_t length);
 extern void physical_take_range(uint64_t begin, uint64_t length);
+extern bool physical_is_free(uint64_t addr);
 extern void physical_set_limit(uint64_t limit);
 extern uint64_t alloc_phys_frame(void);
 extern uint64_t alloc_phys_frames(uint64_t num);

@@ -45,17 +45,13 @@ extern uint64_t _kernel_code_pages, _kernel_ro_pages, _kernel_rw_pages;
 void kernel_main(uint64_t magic, uint64_t mbi)
 {
   struct multiboot_tag *tag;
+  uint8_t *rsdp = NULL;
   uint16_t selector;
   uint64_t mem_end, mem_limit = 0;
   tss_t *tss_ptr;
   uint32_t i;
   uint64_t base, tmp, end;
   uint8_t *config;
-
-  extern uint16_t my_cs, my_ds;
-  extern uint32_t my_cr0, my_cr3, my_cr4;
-
-  printf("cr0 %X, cr3 %X, cr4 %X, cs %X, ds %X\n", my_cr0, my_cr3, my_cr4, my_cs, my_ds);
 
   /* multiboot2 */
   if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
@@ -99,6 +95,20 @@ void kernel_main(uint64_t magic, uint64_t mbi)
       break;
     }
 
+    case MULTIBOOT_TAG_TYPE_ACPI_OLD: {
+      struct multiboot_tag_old_acpi *acpi
+        = (struct multiboot_tag_old_acpi *) tag;
+      rsdp = acpi->rsdp;
+      break;
+    }
+
+    case MULTIBOOT_TAG_TYPE_ACPI_NEW: {
+      struct multiboot_tag_new_acpi *acpi
+        = (struct multiboot_tag_new_acpi *) tag;
+      rsdp = acpi->rsdp;
+      break;
+    }
+
     }
   }
 
@@ -138,7 +148,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   percpu_init();
 
-  acpi_init();
+  acpi_init(rsdp);
 
   lapic_init();
 
@@ -169,6 +179,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
     panic("Missing VM images");
 
   parse_boot_info(config, &vm_config);
+  vm_unmap_pages(config, i);
 
   /* access mbi before removing identity mapping */
   for (tag = (struct multiboot_tag *) (mbi + 8); 
@@ -199,7 +210,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   spin_lock(&mtrr_lock);
   mtrr_sync++;
   spin_unlock(&mtrr_lock);
-  /* required synchronization for mtrr update */
+  /* requires synchronization for mtrr update */
   while (mtrr_sync != g_cpus) ;
 
   mtrr_config();
