@@ -28,6 +28,7 @@
 #include "utils/screen.h"
 #include "utils/bits.h"
 #include "mm/physical.h"
+#include "virt/linux.h"
 
 //#define VIRT_DEBUG
 
@@ -90,7 +91,7 @@ static void virt_main(void)
   virt_diagnose();
 }
 
-static void virt_guest_setup(void)
+static void virt_guest_setup(vm_struct_t *vm)
 {
   uint64_t val;
 
@@ -112,37 +113,37 @@ static void virt_guest_setup(void)
   vmwrite(VMCS_GUEST_CR4, val);
 
   /* accessed bit must be 1, 32-bit code, granularity 1 */
-  vmwrite(VMCS_GUEST_CS_SEL, 0x8);
+  vmwrite(VMCS_GUEST_CS_SEL, 0x10);
   vmwrite(VMCS_GUEST_CS_BASE, 0);
   vmwrite(VMCS_GUEST_CS_LMT, 0xFFFFFFFF);
   vmwrite(VMCS_GUEST_CS_ACC, 0xC09B);
 
   /* accessed bit must be 1, granularity 1 */
-  vmwrite(VMCS_GUEST_DS_SEL, 0x10);
+  vmwrite(VMCS_GUEST_DS_SEL, 0x18);
   vmwrite(VMCS_GUEST_DS_BASE, 0);
   vmwrite(VMCS_GUEST_DS_LMT, 0xFFFFFFFF);
   vmwrite(VMCS_GUEST_DS_ACC, 0xC093);
 
   /* accessed bit must be 1, granularity 1 */
-  vmwrite(VMCS_GUEST_ES_SEL, 0x10);
+  vmwrite(VMCS_GUEST_ES_SEL, 0x18);
   vmwrite(VMCS_GUEST_ES_BASE, 0);
   vmwrite(VMCS_GUEST_ES_LMT, 0xFFFFFFFF);
   vmwrite(VMCS_GUEST_ES_ACC, 0xC093);
 
   /* accessed bit must be 1, granularity 1 */
-  vmwrite(VMCS_GUEST_SS_SEL, 0x10);
+  vmwrite(VMCS_GUEST_SS_SEL, 0x18);
   vmwrite(VMCS_GUEST_SS_BASE, 0);
   vmwrite(VMCS_GUEST_SS_LMT, 0xFFFFFFFF);
   vmwrite(VMCS_GUEST_SS_ACC, 0xC093);
 
   /* accessed bit must be 1, granularity 1 */
-  vmwrite(VMCS_GUEST_FS_SEL, 0x10);
+  vmwrite(VMCS_GUEST_FS_SEL, 0x18);
   vmwrite(VMCS_GUEST_FS_BASE, 0);
   vmwrite(VMCS_GUEST_FS_LMT, 0xFFFFFFFF);
   vmwrite(VMCS_GUEST_FS_ACC, 0xC093);
 
   /* accessed bit must be 1, granularity 1 */
-  vmwrite(VMCS_GUEST_GS_SEL, 0x10);
+  vmwrite(VMCS_GUEST_GS_SEL, 0x18);
   vmwrite(VMCS_GUEST_GS_BASE, 0);
   vmwrite(VMCS_GUEST_GS_LMT, 0xFFFFFFFF);
   vmwrite(VMCS_GUEST_GS_ACC, 0xC093);
@@ -159,7 +160,7 @@ static void virt_guest_setup(void)
   vmwrite(VMCS_GUEST_TR_LMT, 0xFFFFF);
   vmwrite(VMCS_GUEST_TR_ACC, 0x408B);
 
-  vmwrite(VMCS_GUEST_GDTR_BASE, 0);
+  vmwrite(VMCS_GUEST_GDTR_BASE, vm->gdtr);
   vmwrite(VMCS_GUEST_GDTR_LMT, 0xFFFF);
   vmwrite(VMCS_GUEST_IDTR_BASE, 0);
   vmwrite(VMCS_GUEST_IDTR_LMT, 0xFFFF);
@@ -186,8 +187,7 @@ static void virt_guest_setup(void)
   vmwrite(VMCS_GUEST_PAT, rdmsr(IA32_PAT));
   vmwrite(VMCS_GUEST_RSP, 0);
 
-  /* quest initial IP: 1MB */
-  vmwrite(VMCS_GUEST_RIP, 0x100000);
+  vmwrite(VMCS_GUEST_RIP, vm->entry_point);
 
 #ifdef VIRT_DEBUG
   printf("Guest: link pointer %llX, PAT %llX, RIP %llX\n",
@@ -379,6 +379,10 @@ void virt_init(boot_info_t *info)
   for (i = 0; i < MAX_CPUS; i++)
     cpu_to_vm[i] = VM_NONE;
 
+  //TODO find vmlinuz and initrd
+  //hardcoded 1 vmlinuz and 1 initrd for now
+  info->num_mod--;
+
   vm_structs = (vm_struct_t *) malloc(info->num_mod * sizeof(vm_struct_t));
   if (vm_structs == NULL)
     panic("Failed malloc for vm_structs");
@@ -387,16 +391,22 @@ void virt_init(boot_info_t *info)
     memcpy(vm_structs[i].name, info->mod_str[i], strlen(info->mod_str[i]) + 1);
     vm_structs[i].vm_id = i;
     vm_structs[i].img_paddr = info->mod_paddr[i];
+    vm_structs[i].img_size = info->mod_size[i];
     vm_structs[i].num_cpus = 0;
     vm_structs[i].ram_size = info->ram_size[i];
     spin_lock_init(&vm_structs[i].lock);
-    for (j = 0; j < MAX_CPUS; j++)
-      vm_structs[i].lauched[j] = false;
 
     if (cur_cpu + info->num_cpus[i] > g_cpus)
       panic("Number of VM CPUs exceeds the available amount");
     for (j = 0; j < info->num_cpus[i]; j++)
       cpu_to_vm[cur_cpu++] = i;
+
+    //TODO find vmlinuz and initrd
+    //hardcoded 1 vmlinuz and 1 initrd for now
+    vm_structs[i].entry_point = LINUX_ENTRY_POINT;
+    i++;
+    vm_structs[i - 1].extra_paddr = info->mod_paddr[i];
+    vm_structs[i - 1].extra_size = info->mod_size[i];
   }
 }
 
@@ -473,9 +483,9 @@ void virt_percpu_init(void)
   vmptrld(vm->vmcs_paddr[vcpu_id]);
   virt_check_error(flags);
 
-  ept_p = virt_pg_table_setup(vm->ram_size);
+  ept_p = virt_pg_table_setup(vm);
 
-  virt_guest_setup();
+  virt_guest_setup(vm);
 
   virt_control_setup(ept_p);
 

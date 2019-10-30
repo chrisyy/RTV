@@ -16,7 +16,7 @@ DEPS := $(OBJS:.o=.d)
 INC_FLAGS := -Iinclude -Iarch/$(ARCH)/include
 ISO_DIR := iso
 
-CFLAGS := -ffreestanding -mcmodel=large -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -g -Wall -Werror -MMD -lgcc $(INC_FLAGS) $(CFG)
+CFLAGS := -ffreestanding -mcmodel=large -mno-mmx -mno-sse -mno-sse2 -mno-red-zone -g -Wall -MMD -lgcc $(INC_FLAGS) $(CFG)
 LDFLAGS := -nostdlib -z max-page-size=4096
 
 .PHONY: all iso clean
@@ -37,11 +37,12 @@ $(OBJS): config.mk
 config.mk:
 	cp -f default_config.mk config.mk
 
-iso: 
+iso:
 	mkdir -p $(ISO_DIR)/boot/grub
 	cp $(PROG) $(ISO_DIR)/boot/
 	cp boot.cfg $(ISO_DIR)/boot/
-	cp test_module $(ISO_DIR)/boot/
+	cp vmlinuz-4.19.50 $(ISO_DIR)/boot/
+	cp initrd.img-4.19.50 $(ISO_DIR)/boot/
 	cp grub.cfg $(ISO_DIR)/boot/grub/
 	grub-mkrescue -o $(PROG).iso $(ISO_DIR)
 

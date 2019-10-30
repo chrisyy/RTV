@@ -162,10 +162,15 @@ typedef struct _vm_struct_t {
   uint16_t vm_id;
   char name[BOOT_STRING_MAX];
   uint64_t img_paddr;
+  uint64_t img_size;  /* byte */
   uint16_t num_cpus;
   uint32_t ram_size;  /* MB */
+  uint64_t input;
+  uint64_t entry_point;
+  uint64_t gdtr;
   uint64_t vmcs_paddr[MAX_CPUS];
-  bool lauched[MAX_CPUS];
+  uint64_t extra_paddr;
+  uint64_t extra_size;  /* byte */
   spinlock_t lock;
 } vm_struct_t;
 
@@ -212,6 +217,6 @@ static inline void vmptrld(uint64_t paddr)
   __asm__ volatile("vmptrld %0" : : "m" (paddr) : "cc");
 }
 
-uint64_t virt_pg_table_setup(uint32_t size);
+uint64_t virt_pg_table_setup(vm_struct_t *vm);
 
 #endif

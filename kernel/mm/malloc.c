@@ -19,41 +19,9 @@
 #include "vm.h"
 #include "debug.h"
 #include "mm/physical.h"
-#include "utils/list.h"
 #include "utils/screen.h"
 #include "utils/spinlock.h"
 
-#define BUDDY_MIN_ORDER 5
-#define BUDDY_MAX_ORDER 22
-
-#define BUDDY_MIN_BLK (1 << BUDDY_MIN_ORDER)
-#define BUDDY_MAX_BLK (1 << BUDDY_MAX_ORDER)
-
-#define USED 0xFF
-
-/*
- * Metadata about this particular block,
- * stored at the beginning of this block.
- * One per free block of memory.
- * There is also 1B meta isFree at the 
- * end of the block.
- */
-typedef struct _buddy_list
-{
-  struct list_head list;
-} buddy_list_t;
-
-/*
- * Bucket of 2^order sized free memory blocks.
- */
-typedef struct _buddy_bucket
-{
-    struct list_head ptr;
-    uint32_t count;
-    uint32_t size;
-} buddy_bucket_t;
-
-#define BUDDY_ENTRIES (BUDDY_MAX_ORDER - BUDDY_MIN_ORDER + 1)
 static buddy_bucket_t bsystem[BUDDY_ENTRIES];
 static void *mem_base = 0;
 static spinlock_t mm_lock = SPINLOCK_UNLOCKED;
@@ -64,7 +32,7 @@ static uint8_t next_power2(uint32_t v)
   uint8_t cnt = BUDDY_MIN_ORDER;
   uint32_t p = 1 << cnt;
 
-  if (v < BUDDY_MIN_BLK) 
+  if (v < BUDDY_MIN_BLK)
     return BUDDY_MIN_ORDER;
 
   while (p < v) {
@@ -211,7 +179,7 @@ void *malloc(uint32_t size)
 {
   uint8_t *pre, *post;
   buddy_list_t *blt;
-  /* 
+  /*
    * preamble: block order (8B), only the first 1B stores
    * the order, the 8B is for alignment of the allocated data,
    * a performance optimization
@@ -226,7 +194,7 @@ void *malloc(uint32_t size)
 
     while (bsystem[entry].count == 0) {
       entry++;
-      if (entry >= BUDDY_ENTRIES) 
+      if (entry >= BUDDY_ENTRIES)
         panic("out of memory");
       split_count++;
     }
@@ -270,7 +238,7 @@ void malloc_init(void)
 
   size = 1 << BUDDY_MAX_ORDER;
   pages = 1 << (BUDDY_MAX_ORDER - PG_BITS);
-  vaddr = MALLOC_PHY_BASE;
+  vaddr = MALLOC_BASE;
   /* malloc memory is not executable, set XD */
   if (size < LARGE_PG_SIZE) {
     paddr = alloc_phys_frames(pages);
@@ -287,12 +255,12 @@ void malloc_init(void)
       panic("out of physical memory");
     pages = 1 << (BUDDY_MAX_ORDER - LARGE_PG_BITS);
     for (i = 0; i < pages; i++) {
-      vm_map_large_page_unrestricted(paddr, PDT_P | PDT_RW | PDT_XD | PDT_PS, vaddr);
+      vm_map_large_page_unrestricted(paddr, PGT_P | PGT_RW | PGT_XD | PDT_PS, vaddr);
       vaddr += LARGE_PG_SIZE;
       paddr += LARGE_PG_SIZE;
     }
   }
-  mem_base = (void *) MALLOC_PHY_BASE;
+  mem_base = (void *) MALLOC_BASE;
 
   /* set up the initial buddy block */
   initial = (buddy_list_t *) mem_base;

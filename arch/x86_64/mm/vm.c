@@ -23,7 +23,6 @@
 #include "asm_string.h"
 #include "utils/spinlock.h"
 
-
 static spinlock_t pg_lock = SPINLOCK_UNLOCKED;
 
 /* canonical address, level 0-3: pml4t to pt */
@@ -92,7 +91,7 @@ void *vm_map_page(uint64_t frame, uint64_t flags)
       return va;
     }
   }
-    
+
   spin_unlock(&pg_lock);
   return NULL;
 }
@@ -132,7 +131,7 @@ void *vm_map_pages(uint64_t frame, uint64_t num, uint64_t flags)
         spin_unlock(&pg_lock);
         return va;
       } else {
-        i = j;
+        i = j + 1;
         count = 0;
       }
     }
@@ -186,18 +185,7 @@ uint64_t vm_unmap_pages(void *va, uint64_t num)
   return frame;
 }
 
-/* unmap and free the physical memory */
-void vm_free_page(void *va)
-{
-  uint64_t frame;
-
-  /* clear data for security */
-  memset(va, 0, PG_SIZE);
-  frame = vm_unmap_page(va);
-  free_phys_frame(frame);
-}
-
-/* 
+/*
  * flags: use PGT_{x} flags
  * vaddr: page-aligned
  */
@@ -206,12 +194,12 @@ void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr)
   uint64_t new;
   uint64_t entry;
   uint64_t *pml4t, *pdpt, *pdt, *pt;
-  
+
   spin_lock(&pg_lock);
 
   pml4t = get_paging_struct_vaddr((uint64_t *) vaddr, 0);
   entry = (vaddr & 0xFF8000000000) >> 39;
-  if ((pml4t[entry] & PGT_P) == 0) { 
+  if ((pml4t[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
       panic("page allocation for PDPT failed");
@@ -245,7 +233,7 @@ void vm_map_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vaddr)
   spin_unlock(&pg_lock);
 }
 
-/* 
+/*
  * flags: use LG_PGT_{x} flags
  * vaddr: large-page-aligned
  */
@@ -254,12 +242,12 @@ void vm_map_large_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vad
   uint64_t new;
   uint64_t entry;
   uint64_t *pml4t, *pdpt, *pdt;
-  
+
   spin_lock(&pg_lock);
 
   pml4t = get_paging_struct_vaddr((uint64_t *) vaddr, 0);
   entry = (vaddr & 0xFF8000000000) >> 39;
-  if ((pml4t[entry] & PGT_P) == 0) { 
+  if ((pml4t[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
       panic("page allocation for PDPT failed");
@@ -284,6 +272,119 @@ void vm_map_large_page_unrestricted(uint64_t frame, uint64_t flags, uint64_t vad
   spin_unlock(&pg_lock);
 }
 
+void *vm_map_large_page(uint64_t frame, uint64_t flags)
+{
+  uint64_t i;
+  void *va;
+  uint64_t *pdt;
+
+  spin_lock(&pg_lock);
+
+  pdt = get_paging_struct_vaddr((uint64_t *) LG_PG_BASE, 2);
+
+  for (i = (LG_PG_BASE >> LARGE_PG_BITS);
+       i < (LG_PG_LIMIT >> LARGE_PG_BITS); i++) {
+    if (!(pdt[i] & PGT_P)) {
+      pdt[i] = frame | flags;
+      va = (void *) (i << LARGE_PG_BITS);
+      spin_unlock(&pg_lock);
+      return va;
+    }
+  }
+
+  spin_unlock(&pg_lock);
+  return NULL;
+}
+
+uint64_t vm_unmap_large_page(void *va)
+{
+  uint64_t frame;
+  uint64_t *pdt;
+  uint64_t i = ((uint64_t) va) >> LARGE_PG_BITS;
+
+  spin_lock(&pg_lock);
+
+  pdt = get_paging_struct_vaddr((uint64_t *) va, 2);
+  i &= PG_TABLE_MASK;
+  frame = pdt[i] & LARGE_PG_MASK;
+  pdt[i] = 0;
+  invalidate_page(va);
+
+  spin_unlock(&pg_lock);
+  return frame;
+}
+
+void *vm_map_large_pages(uint64_t frame, uint64_t num, uint64_t flags)
+{
+  uint64_t i, j;
+  void *va;
+  uint64_t count = 0;
+  uint64_t *pdt;
+
+  if (num < 1) return NULL;
+
+  spin_lock(&pg_lock);
+
+  pdt = get_paging_struct_vaddr((uint64_t *) LG_PG_BASE, 2);
+
+  for (i = (LG_PG_BASE >> LARGE_PG_BITS);
+       i < (LG_PG_LIMIT >> LARGE_PG_BITS) - num + 1; i++) {
+    if (!(pdt[i] & PGT_P)) {
+      count++;
+
+      for (j = i + 1; j < i + num; j++) {
+        if (!(pdt[j] & PGT_P))
+          count++;
+        else
+          break;
+      }
+
+      if (count == num) {
+        for (j = i; j < i + num; j++) {
+          pdt[j] = frame | flags;
+          frame += LARGE_PG_SIZE;
+        }
+
+        va = (void *) (i << LARGE_PG_BITS);
+        spin_unlock(&pg_lock);
+        return va;
+      } else {
+        i = j + 1;
+        count = 0;
+      }
+    }
+  }
+
+  spin_unlock(&pg_lock);
+  return NULL;
+}
+
+uint64_t vm_unmap_large_pages(void *va, uint64_t num)
+{
+  uint64_t frame = 0;
+  uint64_t *pdt;
+  uint8_t *pg = (uint8_t *) va;
+  uint64_t i = ((uint64_t) va) >> LARGE_PG_BITS;
+
+  spin_lock(&pg_lock);
+
+  pdt = get_paging_struct_vaddr((uint64_t *) va, 2);
+  i &= PG_TABLE_MASK;
+  while (num > 0) {
+    if (frame == 0)
+      frame = pdt[i] & LARGE_PG_MASK;
+    pdt[i] = 0;
+    invalidate_page(pg);
+
+    num--;
+    i++;
+    pg += LARGE_PG_SIZE;
+  }
+
+  spin_unlock(&pg_lock);
+  return frame;
+}
+
 void vm_init(void)
 {
   uint16_t i;
@@ -291,10 +392,10 @@ void vm_init(void)
   uint64_t new;
   uint64_t *pml4t, *pdpt, *pdt, *pt;
 
-  /* set up 2MB virtual memory for dynamic kernel mapping */
+  /* set up 2MB virtual memory for dynamic kernel mapping of 4KB pages */
   pml4t = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 0);
   entry = (KERNEL_MAPPING_BASE & 0xFF8000000000) >> 39;
-  if ((pml4t[entry] & PGT_P) == 0) { 
+  if ((pml4t[entry] & PGT_P) == 0) {
     new = alloc_phys_frame();
     if (new == 0)
       panic("page allocation for PDPT failed");
@@ -322,4 +423,9 @@ void vm_init(void)
   pt = get_paging_struct_vaddr((uint64_t *) KERNEL_MAPPING_BASE, 3);
   for (i = 0; i < PG_TABLE_ENTRIES; i++)
     pt[i] = 0;
+
+  /* initialize large page mapping entries */
+  for (i = (LG_PG_BASE >> LARGE_PG_BITS);
+       i < (LG_PG_LIMIT >> LARGE_PG_BITS); i++)
+    pdt[i] = 0;
 }

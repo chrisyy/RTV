@@ -17,9 +17,9 @@
 
 #include "utils/bits.h"
 
-/* 
- * within a uint64_t, bit(n) is the least significant bit, 
- * bit(n + 63) is the most significant bit 
+/*
+ * within a uint64_t, bit(n) is the least significant bit,
+ * bit(n + 63) is the most significant bit
  */
 void bitmap64_set_range(uint64_t *map, uint64_t begin, uint64_t length)
 {
@@ -74,7 +74,8 @@ void bitmap64_clear_range(uint64_t *map, uint64_t begin, uint64_t length)
 bool bitmap64_check_bit(uint64_t *map, uint64_t index)
 {
   uint64_t *ptr = map + (index >> 6);
-  uint64_t mask = 1 << (index % 64);
+  uint64_t mask = 1;
+  mask <<= (index % 64);
   if ((*ptr) & mask)
     return true;
   else

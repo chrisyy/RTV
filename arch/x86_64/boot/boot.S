@@ -166,7 +166,7 @@ _start:
 
   /* install paging struct */
   movl $pml4t, %eax
-  movl %eax, %cr3 
+  movl %eax, %cr3
 
   /* enable PAE paging */
   movl %cr4, %eax
@@ -183,7 +183,7 @@ _start:
   movl %cr0, %eax
   orl $0x80000000, %eax
   andl $0x9FFFFFFF, %eax
-  movl %eax, %cr0 
+  movl %eax, %cr0
 
   lgdt gdt_ptr
 
@@ -195,7 +195,7 @@ _start:
   pushl %ebx
 
   ljmp $0x8, $start64
-  
+
   /* error */
   cli
 

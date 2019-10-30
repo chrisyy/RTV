@@ -3,11 +3,11 @@
 
 #include "types.h"
 
-static inline void *memcpy(void *dest, const void *src, uint64_t cb)
+static inline void *memcpy(void *dest, const void *src, uint64_t n)
 {
   __asm__ volatile("cld; rep movsb"
-                   : "=c" (cb), "=D" (dest), "=S" (src)
-                   : "0" (cb), "1" (dest), "2" (src)
+                   : "=c" (n), "=D" (dest), "=S" (src)
+                   : "0" (n), "1" (dest), "2" (src)
                    : "memory" , "flags");
   return dest;
 }

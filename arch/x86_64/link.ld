@@ -19,22 +19,22 @@ SECTIONS
   {
     arch/x86_64/boot/boot.o (.multiboot)
     arch/x86_64/boot/boot.o (.text)
-  } 
+  }
   .physicalrodata : ALIGN(4K)
   {
     arch/x86_64/boot/boot.o (.rodata)
-  } 
+  }
   .physicaldata : ALIGN(4K)
   {
     arch/x86_64/boot/boot.o (.data)
-  } 
+  }
   .physicalbss : ALIGN(4K)
   {
     arch/x86_64/boot/boot.o (.bss COMMON)
-  } 
+  }
 
   _kernel_start_pa = ALIGN(4K);
-  ASSERT(_kernel_start_pa <= 2M, 
+  ASSERT(_kernel_start_pa <= 2M,
          "Boot pages can't exceed 1MB, identity mapped the first 2MB")
   _boot_pages = (_kernel_start_pa - _boot_start) / 0x1000;
 
@@ -50,10 +50,10 @@ SECTIONS
 
   /* Insert a read-only null-terminated array of pointers to constructors */
   .ctors : AT(LOADADDR(.text) + _text_end - _text) ALIGN(4K)
-  { 
+  {
     _percpu_ctors = .;
     *(.percpu.ctor);
-    QUAD(0) 
+    QUAD(0)
   }
   _percpu_ctors_end = ALIGN(4K);
 
@@ -84,7 +84,7 @@ SECTIONS
   _kernel_ro_pages = (_rodata_end - _rodata) / 0x1000;
   _kernel_rw_pages = (_bss_end - _data) / 0x1000;
 
-  ASSERT(_bss_end <= 6M - 8K, 
+  ASSERT(_bss_end <= 6M - 8K,
          "Kernel pages can't exceed 4MB - 8KB, last 2 pages for GDT/IDT mapping")
 
   .eh_frame (NOLOAD) : AT(LOADADDR(.bss) + _bss_end - _bss) ALIGN(4K)

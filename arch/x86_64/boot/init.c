@@ -38,7 +38,7 @@ spinlock_t mtrr_lock = SPINLOCK_UNLOCKED;
 volatile uint8_t mtrr_sync = 0;
 volatile bool virt_start = false;
 
-extern uint64_t _boot_start, _boot_pages; 
+extern uint64_t _boot_start, _boot_pages;
 extern uint64_t _kernel_code_pages, _kernel_ro_pages, _kernel_rw_pages;
 
 
@@ -49,9 +49,6 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   uint16_t selector;
   uint64_t mem_end, mem_limit = 0;
   tss_t *tss_ptr;
-  uint32_t i;
-  uint64_t base, tmp, end;
-  uint8_t *config;
 
   /* multiboot2 */
   if (magic != MULTIBOOT2_BOOTLOADER_MAGIC) {
@@ -63,17 +60,17 @@ void kernel_main(uint64_t magic, uint64_t mbi)
     return;
   }
 
-  for (tag = (struct multiboot_tag *) (mbi + 8); 
+  for (tag = (struct multiboot_tag *) (mbi + 8);
        tag->type != MULTIBOOT_TAG_TYPE_END;
        tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
              + ((tag->size + 7) & ~7))) {
     switch(tag->type) {
     case MULTIBOOT_TAG_TYPE_MMAP: {
       multiboot_memory_map_t *mmap;
-    
+
       for (mmap = ((struct multiboot_tag_mmap *) tag)->entries;
            (multiboot_uint8_t *) mmap < (multiboot_uint8_t *) tag + tag->size;
-           mmap = (multiboot_memory_map_t *) ((unsigned long) mmap 
+           mmap = (multiboot_memory_map_t *) ((unsigned long) mmap
            + ((struct multiboot_tag_mmap *) tag)->entry_size)) {
         if (mmap->type == MULTIBOOT_MEMORY_AVAILABLE) {
           physical_free_range(mmap->addr, mmap->len);
@@ -115,6 +112,8 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   //TODO: check if SMP_BOOT_ADDR is free memory
 
   physical_set_limit(mem_limit);
+  /* avoid page at address 0 */
+  physical_take_range(0, PG_SIZE);
   /* mark kernel image */
   physical_take_range((uint64_t) &_boot_start, ((uint64_t) &_boot_pages
                       + (uint64_t) &_kernel_code_pages
@@ -122,7 +121,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
                       + (uint64_t) &_kernel_rw_pages) * PG_SIZE);
 
   /* mark modules */
-  for (tag = (struct multiboot_tag *) (mbi + 8); 
+  for (tag = (struct multiboot_tag *) (mbi + 8);
        tag->type != MULTIBOOT_TAG_TYPE_END;
        tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
              + ((tag->size + 7) & ~7))) {
@@ -144,7 +143,7 @@ void kernel_main(uint64_t magic, uint64_t mbi)
 
   interrupt_init();
 
-  vm_init(); 
+  vm_init();
 
   percpu_init();
 
@@ -165,24 +164,10 @@ void kernel_main(uint64_t magic, uint64_t mbi)
   malloc_init();
 
   /* parse config file */
-  base = vm_config.config_paddr & PG_MASK;
-  end = vm_config.config_paddr + vm_config.config_size;
-  tmp = base;
-  for (i = 0; tmp < end; i++) 
-    tmp += PG_SIZE;
-  config = (uint8_t *) vm_map_pages(base, i, PGT_P | PGT_XD);
-  if (config == NULL)
-    panic("Failed to map config module");
-  config += vm_config.config_paddr - base;
-
-  if (vm_config.num_mod == 0)
-    panic("Missing VM images");
-
-  parse_boot_info(config, &vm_config);
-  vm_unmap_pages(config, i);
+  parse_boot_info(&vm_config);
 
   /* access mbi before removing identity mapping */
-  for (tag = (struct multiboot_tag *) (mbi + 8); 
+  for (tag = (struct multiboot_tag *) (mbi + 8);
        tag->type != MULTIBOOT_TAG_TYPE_END;
        tag = (struct multiboot_tag *) ((multiboot_uint8_t *) tag
              + ((tag->size + 7) & ~7))) {
@@ -190,11 +175,11 @@ void kernel_main(uint64_t magic, uint64_t mbi)
       struct multiboot_tag_module *mod = (struct multiboot_tag_module *) tag;
       uint16_t mod_index;
       for (mod_index = 0; mod_index < vm_config.num_mod; mod_index++) {
-        if (strncmp(vm_config.mod_str[mod_index], mod->cmdline, 
+        if (strncmp(vm_config.mod_str[mod_index], mod->cmdline,
             BOOT_STRING_MAX) == 0) {
           vm_config.mod_paddr[mod_index] = mod->mod_start;
           vm_config.mod_size[mod_index] = mod->mod_end - mod->mod_start;
-          printf("mod %u: %llX %llX\n", mod_index, vm_config.mod_paddr[mod_index], vm_config.mod_size[mod_index]);
+          //printf("mod %u: %llX %llX\n", mod_index, vm_config.mod_paddr[mod_index], vm_config.mod_size[mod_index]);
         }
       }
     }

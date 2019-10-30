@@ -22,6 +22,12 @@ static inline void clear_bit64(uint64_t *data, uint8_t index)
   *data &= mask;
 }
 
+/* when data is 0, result is undefined */
+static inline uint8_t count_trailing_zeros_bit64(uint64_t data)
+{
+  return (uint8_t) __builtin_ctzll(data);
+}
+
 static inline uint8_t bitmap64_get(uint64_t *map, uint64_t index)
 {
   return (map[index >> 6] & ((uint64_t) 1 << (index & 63))) > 0 ? 1 : 0;
